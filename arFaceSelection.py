@@ -175,7 +175,7 @@ def ctlOnFace_OnOff( *pArgs):
 
     
 def printNewMenuItem( item ):
-    print item
+    print (item)
 
 def resetCtrl( facePart):
        

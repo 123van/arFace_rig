@@ -1,0 +1,113 @@
+//*************************************************************************************************************
+// Title:		jh_findDuplicateNames.mel
+// Author:		Jørn-Harald Paulsen
+// Created:		May 24, 2012
+// Last Update:		May 24, 2012
+// Description:         Utility to find and rename objects with duplicate names in the scene
+//*************************************************************************************************************
+// MAIN WINDOW
+//*************************************************************************************************************
+global proc jh_findDuplicateNames()
+{
+  //Delete window if it already exists
+  if (`window -q -ex jh_findDuplicateNames`) deleteUI jh_findDuplicateNames;
+  
+  //Main Window
+  window -topEdge 30 -title "Find Duplicate Names"
+  -mxb false -s true -rtf false -mb false -mbv false -w 284 -h 194 jh_findDuplicateNames;
+
+  //Window content
+  columnLayout -adjustableColumn true;
+  text -label "\nUtility to find and rename duplicate names in the scene.";
+  separator -w 240 -h 40;
+  button -label "Just select the objects with duplicate names" -c jh_findDuplicates;
+  separator -w 240 -h 30;
+  button -label "Select and rename objects with duplicate names" -c jh_renameDuplicates;
+  separator -w 240 -h 30;
+  window -e -w 284 -h 194 jh_findDuplicateNames;
+  showWindow jh_findDuplicateNames;
+}
+
+
+global proc jh_findDuplicates()
+{
+  //Create a string-array to store the duplicates in
+  string $duplicateNames[];
+  //Get all of the transform-nodes in the scene
+  string $transformNodes[] = `ls -type transform`;
+  
+  //Create a counter
+  int $counter = 0;
+  //For each object
+  for($node in $transformNodes)
+  {
+    //If it's a duplicate object, put it in the variable for duplicates
+    if(`match "|" $node` == "|")
+    {
+      $duplicateNames[$counter] = $node;
+      $counter = $counter + 1;
+    }
+  }
+  
+  //Get the number of duplicate objects
+  int $numDuplicates = `size $duplicateNames`;
+  //Print information
+  print $duplicateNames;
+  print ("\nThere's a total of " + $numDuplicates + " transform-nodes with the same name in the scene:\n");
+  //Select the duplicate names
+  select -r $duplicateNames;
+}
+
+global proc jh_renameDuplicates()
+{
+  //Create a string-array to store the duplicates in
+  string $duplicateNames[];
+  //Get all of the transform-nodes in the scene
+  string $transformNodes[] = `ls -type transform`;
+  
+  //Create a counter
+  int $counter = 0;
+  //For each object
+  for($node in $transformNodes)
+  {
+    //If it's a duplicate object, put it in the variable for duplicates
+    if(`match "|" $node` == "|")
+    {
+      $duplicateNames[$counter] = $node;
+      $counter = $counter + 1;
+    }
+  }
+
+  //Reset the counter
+  $counter = 0;
+  //For each of the duplicate objects
+  for($duplicate in $duplicateNames)
+  {
+    //Tokenize the strings
+    string $nameBuffer[];
+    int $numTokens = `tokenize $duplicate "|" $nameBuffer`;
+    //For each of the tokens
+    for($a=0; $a < `size $nameBuffer`; $a++)
+    {
+      //Get the duplicates of the current token
+      string $dupToken[] = `ls ("*" + $nameBuffer[$a])`;
+      //Get the number of duplicates with the same name as tokenized
+      int $sizeToken = `size $dupToken`;
+      //If there's more than one object
+      if($sizeToken > 1)
+      {
+        //For each duplicate name
+        for($i=1; $i < $sizeToken; $i++)
+        {
+          $dupToken[$i] = `rename $dupToken[$i] ($nameBuffer[$a] + "_dup_" + $i)`;
+          $counter = $counter + 1;
+        }
+      }
+    }
+  }
+
+  //Print information
+  print ("\nA total of " + $counter + " transform-nodes was renamed\n");
+}
+
+jh_findDuplicateNames;

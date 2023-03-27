@@ -1,0 +1,80 @@
+[0105/135210.850:INFO:CONSOLE(1)] "Long rAF frame-time", source: file:///C:/Program%20Files/Adobe/Adobe%20Photoshop%202020/Required/www-rich-tooltips/build/external.js (1)
+[0114/035634.594:ERROR:browser_gpu_channel_host_factory.cc(139)] Failed to launch GPU process.
+[0223/110705.511:INFO:CONSOLE(1)] "Long rAF frame-time", source: file:///C:/Program%20Files/Adobe/Adobe%20Photoshop%202020/Required/www-rich-tooltips/build/external.js (1)
+[0225/150716.787:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0225/150721.813:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0225/152619.375:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0225/152624.384:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0225/154850.391:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0225/154855.406:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0226/075619.777:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0226/075624.798:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0226/104048.871:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0226/104053.889:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0226/113621.331:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0226/113626.345:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0226/115328.326:ERROR:mf_helpers.cc(14)] Error in dxva_video_decode_accelerator_win.cc on line 1612
+[0226/115328.326:ERROR:mf_helpers.cc(14)] Error in dxva_video_decode_accelerator_win.cc on line 842
+[0226/115328.351:WARNING:angle_platform_impl.cc(52)] compileToBinary(230): 
+C:\fakepath(69,8-58): warning X3571: pow(f, e) will not work for negative f, use abs(f) or conditionally handle negative values if you expect them
+C:\fakepath(77,9-43): warning X3571: pow(f, e) will not work for negative f, use abs(f) or conditionally handle negative values if you expect them
+
+[0226/115329.914:ERROR:mf_helpers.cc(14)] Error in dxva_video_decode_accelerator_win.cc on line 1612
+[0226/115329.914:ERROR:mf_helpers.cc(14)] Error in dxva_video_decode_accelerator_win.cc on line 842
+[0226/123107.822:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0226/123112.835:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0226/123704.141:ERROR:mf_helpers.cc(14)] Error in dxva_video_decode_accelerator_win.cc on line 1612
+[0226/123704.141:ERROR:mf_helpers.cc(14)] Error in dxva_video_decode_accelerator_win.cc on line 842
+[0226/145447.369:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0226/145452.390:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0226/154815.330:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0226/154820.346:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0226/163412.056:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0226/163417.073:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0226/165250.031:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0226/165255.055:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0226/171538.044:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0226/171543.056:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0226/225509.540:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0226/225514.565:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0227/014111.826:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0227/014116.847:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0227/034607.852:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0227/034612.865:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0227/044857.841:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0227/044902.855:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0302/181714.914:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0302/181719.935:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0302/225249.965:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0302/225254.990:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0303/065228.760:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0303/065233.769:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0303/104801.268:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0303/104806.278:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.
+[0512/122642.482:ERROR:mf_helpers.cc(14)] Error in dxva_video_decode_accelerator_win.cc on line 1612
+[0512/122642.483:ERROR:mf_helpers.cc(14)] Error in dxva_video_decode_accelerator_win.cc on line 842
+[0512/122642.507:WARNING:angle_platform_impl.cc(52)] compileToBinary(230): 
+C:\fakepath(69,8-58): warning X3571: pow(f, e) will not work for negative f, use abs(f) or conditionally handle negative values if you expect them
+C:\fakepath(77,9-43): warning X3571: pow(f, e) will not work for negative f, use abs(f) or conditionally handle negative values if you expect them
+
+[0513/044411.038:ERROR:browser_gpu_channel_host_factory.cc(139)] Failed to launch GPU process.
+[0606/025543.733:INFO:CONSOLE(1)] "Long rAF frame-time", source: file:///C:/Program%20Files/Adobe/Adobe%20Photoshop%202020/Required/www-rich-tooltips/build/external.js (1)
+[0606/025543.806:ERROR:mf_helpers.cc(14)] Error in dxva_video_decode_accelerator_win.cc on line 1612
+[0606/025543.806:ERROR:mf_helpers.cc(14)] Error in dxva_video_decode_accelerator_win.cc on line 842
+[0606/025543.840:WARNING:angle_platform_impl.cc(52)] compileToBinary(230): 
+C:\fakepath(69,8-58): warning X3571: pow(f, e) will not work for negative f, use abs(f) or conditionally handle negative values if you expect them
+C:\fakepath(77,9-43): warning X3571: pow(f, e) will not work for negative f, use abs(f) or conditionally handle negative values if you expect them
+
+[0606/033631.217:ERROR:mf_helpers.cc(14)] Error in dxva_video_decode_accelerator_win.cc on line 1612
+[0606/033631.217:ERROR:mf_helpers.cc(14)] Error in dxva_video_decode_accelerator_win.cc on line 842
+[0606/034114.250:ERROR:mf_helpers.cc(14)] Error in dxva_video_decode_accelerator_win.cc on line 1612
+[0606/034114.250:ERROR:mf_helpers.cc(14)] Error in dxva_video_decode_accelerator_win.cc on line 842
+[0606/034747.227:ERROR:mf_helpers.cc(14)] Error in dxva_video_decode_accelerator_win.cc on line 1612
+[0606/034747.227:ERROR:mf_helpers.cc(14)] Error in dxva_video_decode_accelerator_win.cc on line 842
+[0606/034747.531:ERROR:mf_helpers.cc(14)] Error in dxva_video_decode_accelerator_win.cc on line 1612
+[0606/034747.531:ERROR:mf_helpers.cc(14)] Error in dxva_video_decode_accelerator_win.cc on line 842
+[0606/034747.845:ERROR:mf_helpers.cc(14)] Error in dxva_video_decode_accelerator_win.cc on line 1612
+[0606/034747.845:ERROR:mf_helpers.cc(14)] Error in dxva_video_decode_accelerator_win.cc on line 842
+[0606/034748.152:ERROR:mf_helpers.cc(14)] Error in dxva_video_decode_accelerator_win.cc on line 1612
+[0606/034748.153:ERROR:mf_helpers.cc(14)] Error in dxva_video_decode_accelerator_win.cc on line 842
+[0613/012818.200:WARNING:dns_config_service_win.cc(668)] Failed to read DnsConfig.

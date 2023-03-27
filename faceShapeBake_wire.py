@@ -199,7 +199,6 @@ def shapeBakeWire_tool():
     cmds.button( label = 'write CrvData', command = writeCrvData_json )  
     cmds.button( label = 'findClosestCrv', command = findClosestCrv )
     
-    print swWindow
     dock = "swDock"
     if cmds.dockControl(dock, exists=True):
         cmds.deleteUI(dock)
@@ -218,6 +217,7 @@ def spaceBetween( numOfRow, numOfColm ):
             cmds.text( l = '')
             
 def printNewMenuItem( item ):
+    
     print item
 
 def arHelpImage( imageTitle ):   
@@ -239,6 +239,7 @@ def lipWideNarrow_helpImage( *pArgs ):
 def copyCrvBS_delta( *pArgs):
     wireDfmTitle = cmds.textField( 'wireDfom_name', query=True, text=True )
     print wireDfmTitle
+
     curvs = cmds.ls( os=1 )
     # curve with blendShape
     sourceCrv = curvs[0]
@@ -259,7 +260,9 @@ def copyCrvBS_delta( *pArgs):
    
 def transferWireBS( *pArgs ):
     wireDfmName = cmds.textField( 'wireDfom_name', query=True, text=True )
+
     print wireDfmName
+
     curvs = cmds.ls( os=1 )
     # curve with blendShape
     srcCrv = curvs[0]
@@ -309,7 +312,8 @@ def WideTight_crvBS_old(*pArgs):
         udRatioCrv = cmds.rename( temCrv, 'udRatioCrv' )
         
         meter = 1.0/totalCvs
-        print meter
+        print 
+        
         ratios =[]
         udPocs =[]
         for x in range(totalCvs+1):
@@ -342,12 +346,16 @@ def WideTight_crvBS_old(*pArgs):
             cmds.setAttr( poc + ".parameter", prm*(i+1) - rt/10.0 )
 
             tightPos = cmds.getAttr( poc + ".position" )[0]
+
             print tightPos
+
             cmds.xform( tightCrv + ".cv[%s]"%cvIndex, ws=1, t = tightPos )
             
             cmds.setAttr( poc + ".parameter", prm*(i+1) + rt/10.0 )
             widePos = cmds.getAttr( poc + ".position" )[0]
+
             print widePos
+            
             cmds.xform( wideCrv + ".cv[%s]"%cvIndex, ws=1, t = widePos )
             
             cmds.setAttr( poc + ".parameter", prm*(i+1))
@@ -366,7 +374,7 @@ def WideTight_crvBS_old(*pArgs):
         cmds.blendShape( tightCrv, wideCrv , upCrv, downCrv, wtBaseCrv, n = "wtCrv_BS" )
         cmds.parent( tightCrv, wideCrv, upCrv, downCrv, cornerTgtGrp )
         cmds.hide(cornerTgtGrp)
-        #cmds.delete( wtRatioCrv, udRatioCrv )
+        #cmds.delete( wtRatioCrv, udRatioCrv );
 
 def WideTight_crvBS(*pArgs):
     numOfCvs = cmds.optionMenu('number_CVs', query=True, value=True )
@@ -2109,8 +2117,8 @@ def EPCurve_chordLength():
 		    vtxPos = cmds.xform( t, q=1, t=1, ws=1)
 		    mrrPos = [-vtxPos[0],vtxPos[1],vtxPos[2]]
 		    if vtxPos[0]-mrrPos[0]>0.001:
-			    orderPos.append(mrrPos)        
-	    print len(orderPos), 
+			    orderPos.append(mrrPos)
+            
 	    for v in vtx:		    
 		    vtxPos = cmds.xform( v, q=1, t=1, ws=1)
 		    orderPos.append(vtxPos)
@@ -3261,6 +3269,50 @@ def findClosesetCrvData_old( myCrv, filePath ):
   
     
 
+
+#research the crv shapes and parameter
+def lipCrv_cvParmsAverage():
+
+    crvs = cmds.ls(sl=1, l =1 )
+    cvParam = {}
+    crvLsLen = len(crvs)
+    
+    oldList = [ x*0 for x in range(8)]
+    for crv in crvs:
+            
+        cvs = [ crv + '.cv[1]', crv + '.cv[2]', crv + '.cv[3]', crv + '.cv[5]', crv + '.cv[6]', crv + '.cv[7]', crv + '.cv[8]', crv + '.cv[9]' ]
+    
+        paramList = []   
+        for i, cv in enumerate(cvs):
+            
+            pos = cmds.xform( cv, q=1, ws=1, t=1 ) 
+            uParam = getUParam ( pos, crv )
+            
+            paramList.append(uParam + oldList[i] )           
+        
+        cvParam[crv]=paramList
+        print cvParam
+        
+    #sum of each parameter
+    preVal = [ x*0 for x in range(8)]
+    parmSumList = []
+    for crv, val in cvParam.items():
+        
+        if crv in crvs[1:]:
+            preVal = parmSumList
+        
+        temp = []    
+        for i, v in enumerate(val):        
+                    
+            temp.append((v + preVal[i]))
+            
+        parmSumList = temp    
+
+    avrg = [ p/crvLsLen for p in parmSumList ]
+    return avrg
+    
+    
+
 #lip_smoothWeight select lipShpCrv and headGeo
 def lipSmoothWeight( crv , headGeo ):
 
@@ -3329,49 +3381,7 @@ def lipSmoothWeight( crv , headGeo ):
     else:
         cmds.confirmDialog( title='Confirm', message='more than 1 lipCrv or headGeo!! ' )            
 
-
         
-#research the crv shapes and parameter
-def lipCrv_cvParamAverage():
-
-    crvs = cmds.ls(sl=1, l =1 )
-    cvParam = {}
-    crvLsLen = len(crvs)
-    
-    oldList = [ x*0 for x in range(8)]
-    for crv in crvs:
-            
-        cvs = [ crv + '.cv[1]', crv + '.cv[2]', crv + '.cv[3]', crv + '.cv[5]', crv + '.cv[6]', crv + '.cv[7]', crv + '.cv[8]', crv + '.cv[9]' ]
-    
-        paramList = []   
-        for i, cv in enumerate(cvs):
-            
-            pos = cmds.xform( cv, q=1, ws=1, t=1 ) 
-            uParam = getUParam ( pos, crv )
-            
-            paramList.append(uParam + oldList[i] )           
-        
-        cvParam[crv]=paramList
-        print cvParam
-        
-    #sum of each parameter
-    preVal = [ x*0 for x in range(8)]
-    parmSumList = []
-    for crv, val in cvParam.items():
-        
-        if crv in crvs[1:]:
-            preVal = parmSumList
-        
-        temp = []    
-        for i, v in enumerate(val):        
-                    
-            temp.append((v + preVal[i]))
-            
-        parmSumList = temp    
-
-    avrg = [ p/crvLsLen for p in parmSumList ]
-    return avrg
-    
 
    
 
@@ -3429,3 +3439,5 @@ def jointIndices( geo, jntList ):
         jntIndex[jnt] = re.findall( '\d+', jntID )[0]
         
     return jntIndex
+    
+    
