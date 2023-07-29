@@ -1080,8 +1080,6 @@ def connectBrowCtrls ( numOfCtl, size, offset, crv ):
     cmds.connectAttr( 'browFactor.browUp_scale', reverseMult + ".input1Z", f=1)
     cmds.connectAttr ( 'browFactor.browRotateY_scale', reverseMult + '.input1Y', f=1 )
     cmds.setAttr( reverseMult + ".input2", -1,-1,-1 )
-    if cmds.listConnections(reverseMult + ".input1X", s=1, d=0):
-        print "reverse mult connected"
    
     if cmds.objExists("browCrv_grp"):
         cmds.delete("browCrv_grp")        
@@ -2298,20 +2296,28 @@ def mouthJoint( upLow, numCtls ):
     tempflatCrv  = cmds.curve(d = 3, p =([0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0])) 
     cmds.rebuildCurve(rt = 0, d = 3, kr = 0, s = numCtls-1 )
     #cmds.rebuildCurve (browCtlCrv, rebuildType = 0, spans = numOfCtl-1, keepRange = 0, degree = 3 )         
-    bsCrv   = cmds.rename( tempflatCrv, upLow + '_lipBS_crv')    
+    bsCrv   = cmds.rename( tempflatCrv, upLow + '_lipBS_crv')     
+    bsCrvShape  = cmds.listRelatives( bsCrv, c = True )    
     
     jawTempCrv = cmds.duplicate( bsCrv )
     jawOpenCrv = cmds.rename( jawTempCrv[0], upLow +'_jawOpen_crv' )
+    jawOpenCrvShape = cmds.listRelatives( jawOpenCrv, c = True)
     
     jawDropTempCrv = cmds.duplicate( bsCrv )
     jawDropCrv = cmds.rename( jawDropTempCrv[0], upLow +'_jawDrop_crv' )
+    jawDropCrvShape = cmds.listRelatives( jawDropCrv, c = True)
     
     tmplipRollCrv = cmds.duplicate( bsCrv )
     lipRollCrv = cmds.rename(tmplipRollCrv, upLow + '_lipRoll_crv' )
+    lipRollCrvShape = cmds.listRelatives(lipRollCrv, c =1 )    
 
-    tmplipPuffCrv = cmds.curve(d = 3, p =([0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0])) 
-    cmds.rebuildCurve(tmplipPuffCrv, rt = 0, d = 3, kr = 0, s = numCtls-1 )
-    lipPuffCrv = cmds.rename( tmplipPuffCrv[0], upLow +'_lipScale_crv' )
+    tmplipPuffCrv = cmds.duplicate( bsCrv )
+    lipPuffCrv = cmds.rename( tmplipPuffCrv[0], upLow +'_lipPuff_crv' )
+    lipPuffCrvShape = cmds.listRelatives( lipPuffCrv, c = True )
+    
+    '''tempPffCrv = cmds.curve(d = 3, p =([0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0])) 
+    tmplipPuffCrv = cmds.rebuildCurve(tempPffCrv, rt = 0, d = 3, kr = 0, s = numCtls-1 )
+    lipPuffCrv = cmds.rename( tmplipPuffCrv[0], upLow +'_lipScale_crv' )'''
     
     linearDist = 1.0/(vNum-1)
     lipJnts = [] 
@@ -3868,8 +3874,7 @@ def vertices_distanceOrder( myVert ):
             
             vertDist[ vt ] = dist    
         
-        print vertDist
-        secondVert = min(vertDist, key= vertDist. get) 
+        secondVert = min(vertDist, key= vertDist.get) 
         print secondVert    
     
         orderedVerts.append(secondVert)

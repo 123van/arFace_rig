@@ -1159,8 +1159,8 @@ def jointIndices( geo, jntList ):
     
 def eyeLidCrvIsolate( crvTitle ):
 
-    eyeLidCrv = {  "squint_crv":[ "upSquint_crv", "loSquint_crv" ], "annoy_crv":[ "upAnnoyed_crv", "loAnnoyed_crv" ], "PushA_crv":[ "upALid_crv", "loALid_crv" ], "PushB_crv":[ "l_upLidPushB_crv", "l_loLidPushB_crv" ],
-    "PushC_crv":[ "l_upLidPushC_crv", "l_loLidPushC_crv" ], "PushD_crv":[ "l_upLidPushD_crv", "l_loLidPushD_crv" ] }    
+    eyeLidCrv = {  "squint_crv":[ "upSquint_crv", "loSquint_crv" ], "annoy_crv":[ "upAnnoyed_crv", "loAnnoyed_crv" ], "PushA_crv":[ "upALid_crv", "loALid_crv" ], "PushB_crv":[ "upBLid_crv", "loBLid_crv" ],
+    "PushC_crv":[ "upCLid_crv", "loCLid_crv" ], "PushD_crv":[ "upDLid_crv", "loDLid_crv" ] }    
     
     eyeCrvClass = []
     for eCrv in eyeLidCrv:
@@ -1214,7 +1214,7 @@ def lipCrvIsolate( lipTitle ):
 
 def browCrvIsolate( browTitle ):
 
-    browCrv = { "browSad":["l_BrowSad_crv", "r_BrowSad_crv"], "browMad":["l_BrowMad_crv", "r_BrowMad_crv"], "furrow":["l_Furrow_crv", "r_Furrow_crv"], 
+    browCrv = { "browUp":["l_BrowUp_crv", "r_BrowUp_crv"], "browDown":["l_BrowDown_crv", "r_BrowDown_crv"], "browSad":["l_BrowSad_crv", "r_BrowSad_crv"], "browMad":["l_BrowMad_crv", "r_BrowMad_crv"], "furrow":["l_Furrow_crv", "r_Furrow_crv"], 
     "relax":["l_Relax_crv", "r_Relax_crv"] } 
 
     for eV in browCrv :

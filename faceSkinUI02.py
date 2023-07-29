@@ -666,6 +666,8 @@ def faceSkinUI():
 
     cmds.text( label = 'brow curve')
     cmds.optionMenu('brow_crv', bgc=[0,0,0], changeCommand= printNewMenuItem )
+    cmds.menuItem( label= "browUp" )
+    cmds.menuItem( label= "browDown" )
     cmds.menuItem( label= "browSad" )
     cmds.menuItem( label= "browMad" )
     cmds.menuItem( label= "furrow" )
