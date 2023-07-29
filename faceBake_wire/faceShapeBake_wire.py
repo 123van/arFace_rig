@@ -8,7 +8,7 @@ from maya import OpenMaya
 import os.path
 import json
 from functools import partial
-
+import pymel.core as pm
 
 def shapeBakeWire_tool():
 
@@ -1028,7 +1028,7 @@ def bakeCrvBS_delta( sourceCrv, targetCrv, name):
 
         comp = [0]
         for i in range( numTgt ):
-            # length of comp is different for each target because the vertexs that has none movement don't counts
+            # browLength of comp is different for each target because the vertexs that has none movement don't counts
             comp = cmds.getAttr(crvBS[0]+ '.inputTarget[0].inputTargetGroup[%s].inputTargetItem[6000].inputComponentsTarget'%str(i) )
             delta = cmds.getAttr(crvBS[0]+ '.inputTarget[0].inputTargetGroup[%s].inputTargetItem[6000].inputPointsTarget'%str(i) )
             newDelta = []
@@ -1041,7 +1041,7 @@ def bakeCrvBS_delta( sourceCrv, targetCrv, name):
                 cmds.setAttr(newBS[0]+'.inputTarget[0].inputTargetGroup[%s].inputTargetItem[6000].inputComponentsTarget'%str(i), len(comp), *comp, type="componentList" )
                 cmds.setAttr(newBS[0]+'.inputTarget[0].inputTargetGroup[%s].inputTargetItem[6000].inputPointsTarget'%str(i), len(newDelta), *newDelta, type="pointArray" )
             else:
-                cmds.confirmDialog( title='Confirm', message='dnTarget[i] + " has no delta ' )
+                cmds.confirmDialog( title='Confirm', message='dnTarget[index] + " has no delta ' )
 
     else:
         cmds.confirmDialog( title='Confirm', message='create blendShape first' )
@@ -1771,7 +1771,7 @@ def shapeToCurve():
         uParam = getUParam ( pos, targetCrv )
         print (uParam )       
         dnPOC = cmds.shadingNode ( 'pointOnCurveInfo', asUtility=True, n = 'dnPOC'+ str(i+1).zfill(2))
-        #loc = cmds.spaceLocator ( n = "targetPoc"+ str(i+1).zfill(2))
+        #loc = cmds.spaceLocator ( n = "targetPoc"+ str(index+1).zfill(2))
         cmds.connectAttr (targetCrvShape[0] + ".worldSpace",  dnPOC + '.inputCurve')
         #cmds.setAttr ( dnPOC + '.turnOnPercentage', 1 )
         cmds.setAttr ( dnPOC + '.parameter', uParam )        
@@ -2262,9 +2262,9 @@ def mapCurve( vtx, name, openClose, degree ):
         cmds.setAttr(  endCV + '.xValue', 0 )
 
         '''
-        for i, pos in enumerate(orderPosAll) :
+        for index, pos in enumerate(orderPosAll) :
             
-            cmds.xform( guideCircle + '.cv[%s]'%str(i+1), ws=1, t = pos )
+            cmds.xform( guideCircle + '.cv[%s]'%str(index+1), ws=1, t = pos )
         cmds.xform( guideCircle + '.cv[0]', ws=1, t = orderPosAll[-1] )'''
         
         cmds.select( guideCircle, r=1 )
@@ -3160,7 +3160,7 @@ def findClosesetCrvData_old( myCrv, filePath ):
                 print "the %s's margin of error is %s"%(fCrv, finalDict[fCrv])
                 fCrvDict = crvData[fCrv]
                 referFile = fCrvDict["sceneName"]                
-                cmds.file( referFile, i =1,  mergeNamespacesOnClash = 1 )'''     
+                cmds.file( referFile, index =1,  mergeNamespacesOnClash = 1 )'''
             
         if finalList:            
         
@@ -3426,140 +3426,97 @@ def lipShapeAverage():
 
 
 
-'''
-def jawDrop_lengthAvrg(): 
+#select center vertex on the loop of lip / next vertex(direction)
+def lip_prototypeCrv():
 
-#avrg = [0.0, 0.05363660170930254, 0.12546778749581972, 0.2520775429903461, 0.2974216966500808, 0.37895697129032, 0.44257646146633456, 0.5]
+    selection = cmds.ls(os=1, )
+    verts = cmds.filterExpand(selection, sm=31)
+    #select only vertices
+    if not verts and not len(verts)==2:
+        raise Exception("You must select 2 vertices") # exits method or function
 
-    jawDrop =0
-    lenth = len(crvs)
-    for crv in crvs:
-        crvShp = cmds.listRelatives( crv, c=1, fullPath=1, ni = 1 )
-        if crvShp:
-            if cmds.nodeType(crvShp[0]) == "nurbsCurve":
-                        
-                crvBbox = cmds.exactWorldBoundingBox( crvShp[0] )
-                loc = cmds.spaceLocator( n = crv.split("_")[0] + "_loc")
-                cmds.xform( loc, ws=1, t = (crvBbox[0],crvBbox[1],crvBbox[2]) ) 
-                jawOpenRatio = (crvBbox[4] - crvBbox[1])/crvBbox[3]
-                jawDrop += jawOpenRatio        
-            
-    jawDrop/lenth'''
+    firstVert, secondVert = verts# it becomes curve cv[1],cv[2]
 
+    cmds.select (firstVert,secondVert, r =1)
+    # select vertices on the loop
+    tempVerts = orderedVerts_edgeLoop()
+    vertsOnLoop = [tempVerts[-1]] + tempVerts +tempVerts[:2]
+    vertsPos = []
+    for v in vertsOnLoop:
+        pos = cmds.xform( v, q =1, ws =1, t =1 )
+        vertsPos.append(pos)
 
-#select center vertex on the loop of lip / adjasent vertex(direction)
-def create_prototypeCrv():
+    #knots = number of CVs + degree - 1
+    knotLen = [ x for x in range(len(vertsPos)+2) ]
+    tempCrv = cmds.curve( d =3, per=1, p = vertsPos , k = knotLen )
+    loopCrv = cmds.rebuildCurve( tempCrv, ch =0, replaceOriginal =1, keepRange=0, keepControlPoints=1, keepEndPoints=1, degree=3 )[0]
+    cmds.xform( loopCrv, centerPivots=1 )
 
-    myVert = cmds.ls(os=1)
-    if myVert:
-        #rebuild the polyEdgeToCurve1 for lip & jawDrop ctl
-        if len(myVert)==2:
-            firstVert = myVert[0]
-            secondVert = myVert[1]
-            
-            cmds.select (firstVert,secondVert, r =1)
-            mel.eval('ConvertSelectionToContainedEdges')
-            firstEdge = cmds.ls( sl=1 )[0]
-            
-            cmds.polySelectSp( firstEdge, loop =1 )
-            tempCrv=cmds.polyToCurve(form=3,degree=1)
-                
-        jawDropVal =0
-        crvShp = cmds.listRelatives( tempCrv, c=1, fullPath=1, ni = 1 )
-        if crvShp:
-            if cmds.nodeType(crvShp[0]) == "nurbsCurve":
-                        
-                crvBbox = cmds.exactWorldBoundingBox( crvShp[0] )
-                cmds.xform( loc, ws=1, t = (crvBbox[0],crvBbox[1],crvBbox[2]) ) 
-                jawDropVal = crvBbox[3]*2
-                
-        ctlName = cmds.promptDialog(
-                        title='put name for jawDrop ctl',
-                        message='Enter Name:',
-                        button=['OK', 'Cancel'],
-                        defaultButton='OK',
-                        cancelButton='Cancel',
-                        dismissString='Cancel')
+    avrg = [0.0, 0.054260471676417114, 0.12498473808447197, 0.19663351979864205, 0.250, 0.3018463892654337, 0.3788140065929279, 0.44033009804322876, 0.5]
 
-        if ctlName == 'OK':
-                jawDropCtl = cmds.promptDialog(query=True, text=True)
-                cmds.setAttr( jawDropCtl + ".ty", jawDropVal )
+    loopCrvShp = cmds.listRelatives( loopCrv, c=1, typ = "nurbsCurve")[0]
+    pointPos = []
+    for i, param in enumerate(avrg):
 
-        cmds.select (firstVert,secondVert, r =1)
-        # select vertices on the loop
-        tempVerts = orderedVerts_edgeLoop()
-        vertsOnLoop = [tempVerts[-1]] + tempVerts +tempVerts[:2]
-        vertsPos = []
-        for v in vertsOnLoop:
-            pos = cmds.xform( v, q =1, ws =1, t =1 )
-            vertsPos.append(pos) 
-            
-        #knots = number of CVs + degree - 1
-        knotLen = [ x for x in range(len(vertsPos)+2) ]
-        tempCrv = cmds.curve( d =3, per=1, p = vertsPos , k = knotLen  )
-        loopCrv = cmds.rebuildCurve( tempCrv, ch =0, rpo =1, kr=0, kcp=1, kep=1, d=3 )[0]
-        cmds.xform( loopCrv, cp=1 )
+        paramPoc = cmds.shadingNode( 'pointOnCurveInfo', asUtility =1, n = 'paramPoc'+ str(i+1))
+        cmds.connectAttr( loopCrvShp + ".worldSpace", paramPoc + ".inputCurve")
+        cmds.setAttr( paramPoc + ".parameter", param )
+        pos = cmds.getAttr(paramPoc + ".result.position")[0]
 
-        avrg = [0.0, 0.054260471676417114, 0.12498473808447197, 0.19663351979864205, 0.250, 0.3018463892654337, 0.3788140065929279, 0.44033009804322876, 0.5]
+        pointPos.append(list(pos))
+        #loc = cmds.spaceLocator ( n = "lipPoc_loc"+str(index+1) )[0]
+        #cmds.connectAttr( paramPoc + '.result.position', loc + '.translate' )
 
-        loopCrvShp = cmds.listRelatives( loopCrv, c=1, typ = "nurbsCurve")[0]
-        pointPos = []
-        for i, param in enumerate(avrg):  
-            
-            paramPoc = cmds.shadingNode( 'pointOnCurveInfo', asUtility =1, n = 'paramPoc'+ str(i+1))        
-            cmds.connectAttr( loopCrvShp + ".worldSpace", paramPoc + ".inputCurve")
-            cmds.setAttr( paramPoc + ".parameter", param )
-            pos = cmds.getAttr(paramPoc + ".result.position")[0]
-
-            pointPos.append(list(pos))
-            #loc = cmds.spaceLocator ( n = "lipPoc_loc"+str(i+1) )[0]
-            #cmds.connectAttr( paramPoc + '.result.position', loc + '.translate' )    
-
-        prototypeCurve( pointPos, "lip", "close", 3 )
-
+    prototypeCurve( pointPos, "lip", "periodic", 3 )
 
 
 def prototypeCurve( pointPos, name, openClose, degree ):
-      
+    """
+
+    Args:create prototype normalized curve based on the lip edgeLoop vertices
+        pointPos: positions of the ordered vertices on edge loop
+        name: str "lip" or "brows"
+        openClose: curve form ( "open","periodic")
+        degree: 3
+
+    Returns:
+
+    """
     orderPos =[]
     mirrOrderPos =[] 
 
     pos1 = pointPos[0]
-    print pos1
     # verts selection is only left part
-    if pos1[0]**2 < 0.001:
-        for pp in pointPos[::-1]:
+    if pos1[0]**2 >= 0.001:
+        raise RuntimeError('object or center vertex is off from center in X axis')
 
-            mrrPos = [-pp[0],pp[1],pp[2]]
-            mirrOrderPos.append(mrrPos)
-            
-    # if verts selection in order entire region
-    else:
-        cmds.confirmDialog( title='Confirm', message='object or center vertex is off from center in X axis' )
-    
+    for pp in pointPos[::-1]:
+
+        mrrPos = [-pp[0],pp[1],pp[2]]
+        mirrOrderPos.append(mrrPos)
+
     # "open" / "close"
     if openClose == "open":
         orderPosAll = mirrOrderPos[:-1] + orderPos
         browMapCrv = cmds.curve( d=float(degree), p= orderPosAll )
         #create unique name
-        mapCrv = cmds.ls( name + "_crv*", typ = "transform" )
+        mapCrv = cmds.ls( name + "_normalizedCrv*", typ = "transform" )
         if not mapCrv:
-            newNum = 01
+            number = 01
         else:
-            lastNum = re.findall('\d+', mapCrv[-1])[0]
-            newNum = int(lastNum)+1
-        mapCrv = cmds.rename( browMapCrv,  name + "_crv"+ str(newNum).zfill(2) )
+            number = len(mapCrv)
+        mapCrv = cmds.rename( browMapCrv,  name + "_normalizedCrv"+ str(number).zfill(2))
         return mapCrv
         
-    elif openClose == "close":
+    elif openClose == "periodic":
         
         #create unique name
-        mapCrv = cmds.ls( name + "_crv*", typ = "transform" )
+        mapCrv = cmds.ls( name + "_normalizedCrv*", typ = "transform" )
+
         if not mapCrv:
-            newNum = 01
+            number = 01
         else:
-            number = re.findall('\d+', mapCrv[-1])[0]
-            newNum = int(number)+1
+            number = len(mapCrv)
             
         '''#create cv curve
         #앞 3개의 포인트와 마지막 세개의 포인트가 같아야 한다( 앞뒤 3개의 CVs가 하나의 span 을 만들기 때문에 )
@@ -3569,13 +3526,14 @@ def prototypeCurve( pointPos, name, openClose, degree ):
         closeCrv = cmds.curve( d =3, per=1, p = orderPos , k = knotLen  )'''
         
         #create ep curve
-        coords = pointPos + mirrOrderPos[1:] 
+        coords = pointPos + mirrOrderPos[1:]
+
         curveFn = OpenMaya.MFnNurbsCurve() 
         arr = OpenMaya.MPointArray()
         for position in coords: 
             arr.append(*position)            
         
-        curveFn.createWithEditPoints( 
+        periodicCurve = curveFn.createWithEditPoints(
                                       arr, 
                                       int(degree), 
                                       OpenMaya.MFnNurbsCurve.kPeriodic, 
@@ -3583,41 +3541,20 @@ def prototypeCurve( pointPos, name, openClose, degree ):
                                       False, 
                                       True 
                                     )
-        
-        '''
-        def editCurve(orderPos):
-            degree = 3
-            coords = orderPos
-           
-            mobj = OpenMaya.MObject()
-            #mDagPath = OpenMaya.MDagPath()
-            curveFn = OpenMaya.MFnNurbsCurve()
-            
-            arr = OpenMaya.MPointArray()
-            for pos in coords: 
-                arr.append(*pos)            
-            
-            mCrv = curveFn.createWithEditPoints( 
-                                          arr, 
-                                          int(degree), 
-                                          OpenMaya.MFnNurbsCurve.kPeriodic, 
-                                          False, 
-                                          False, 
-                                          True
 
-                                        )
-                                        
-            
-            mFnDependNode = OpenMaya.MFnDependencyNode( mCrv )
-            return mFnDependNode.name()
-            #return curveFn.getDagPath()
-        '''
+        lip_crv = curveFn.name()
+        print (lip_crv)
+        curveDepNode = OpenMaya.MFnDependencyNode(periodicCurve)
+        lip_crv = curveDepNode.setName(name + "_normalized_crv" + str(number).zfill(2))
+        cmds.xform( (name + "_normalized_crv" + str(number).zfill(2)), centerPivots=1 )
+        return lip_crv
+
 
 
 #select 2 adjasent vertices ( corner and direction vertex)
 #edge loop상에 있는 버텍스 순서대로 나열한다( for curves )
 def orderedVerts_edgeLoop():
-    
+
     myVert = cmds.ls( os=1, fl=1 )
     if len(myVert)==2:
         firstVert = myVert[0]
@@ -3655,3 +3592,5 @@ def edgeVertDict(edgeList):
         edgeVert = cmds.ls(sl=1, fl=1)
         edgeVertDict[edge] = edgeVert
     return edgeVertDict
+
+

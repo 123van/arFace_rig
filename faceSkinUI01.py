@@ -949,7 +949,7 @@ def faceSkinUI():
     cmds.text( label = '')
     spaceBetween(1,4)
     
-    cmds.text( label = 'joints length:')
+    cmds.text( label = 'joints browLength:')
     jntLen = cmds.intField( 'joint_length', value = 12 )
     cmds.text( label = '')
     cmds.text( label = '')

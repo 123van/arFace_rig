@@ -130,12 +130,12 @@ def faceClusters():
     #temporaly hide face joints for
     clusterDict = { 'jawRigPos': ['jawOpen_cls', 'jawClose_cls' ], 'lipYPos':'lip_cls', 'lipRollPos':'lipRoll_cls', 'lipNPos': 'upLipRoll_cls', 'lipSPos': 'bttmLipRoll_cls', 
     'cheekPos':['l_cheek_cls','r_cheek_cls'], 'lEyePos':[ 'eyeWide_cls', 'eyeBlink_cls'], 'lowCheekPos': ['l_lowCheek_cls', 'r_lowCheek_cls'], 
-    'squintPuffPos':['l_squintPuff_cls', 'r_squintPuff_cls'], 'lEarPos':['l_ear_cls','r_ear_cls'], 'rotXPivot':['browUp_cls','browDn_cls'], 'rotYPivot':'browTZ_cls', 'nosePos': 'nose_cls' }
+    'squintPuffPos':['l_squintPuff_cls', 'r_squintPuff_cls'], 'lEarPos':['l_ear_cls','r_ear_cls'], 'rotXPivot':['browUp_cls','browDn_cls'], 'rotYPivot':['browTZ_cls'], 'nosePos': ['nose_cls', 'sneer_cls'] }
     
     locators = cmds.listRelatives('allPos', ad =1, type = 'transform' )
     for k in clusterDict.keys():
         if not k in locators:
-            print "there is a faceLocators naming problem"   
+            raise RuntimeError("there is a faceLocators naming problem")
     
     cls = cmds.cluster( headGeo, n= 'mouth_cls', bindState =1 )
     cmds.select(headGeo, r=1)
@@ -354,9 +354,6 @@ def clusterOnJoint( loc, clsName, ctlP, offset, rad, sect ):
     return [ctl[0], handle]
 
 
-    
-
-    
 #update rotateY ( from locator to clsParent )    
 #create joint for cluster and ctrl
 #place ctlP for easy grab ( "faceLoc_grp| "faceClsFrame" or "attachCtl_grp"|"midCtl_grp" )
@@ -366,7 +363,7 @@ def clusterForSkinWeight( loc, zDepth, clsName, ctlP, rad, sect, colorID ):
     clsPos = cmds.xform ( loc, q= 1, ws =1 , t=1 )
     clsRot = cmds.xform ( loc, q= 1, ws =1 , ro=1 )
     position = (clsPos[0], clsPos[1], zDepth )
-    ctlName = clsName.replace( 'cls', 'ctl')
+    ctlName = clsName.replace( 'cls', 'clsCtl')
     ctl = genericController( ctlName , position, rad, "sq", colorID )
     cmds.parent( ctl[1], ctlP, r=1 )
     cmds.select(cl=1)
@@ -379,8 +376,6 @@ def clusterForSkinWeight( loc, zDepth, clsName, ctlP, rad, sect, colorID ):
     cmds.select( headGeo, r=1)
     cmds.percent( clsNode[0], v=0.0 )
     return [ctl[0], handle]
-
-
 
 
 
@@ -439,16 +434,10 @@ def updateFaceCluster():
                 else:           
                     cmds.xform( handle, ws=1, rotatePivot = currentPos )
                     clsParent = cmds.listRelatives( handles, p =1 )[0]                    
-                    cmds.xform( clsParent, ws=1, piv = currentPos )       
-     
-
-        
+                    cmds.xform( clsParent, ws=1, piv = currentPos )
 
 
 
-
-
-        
 #update 12/26/2019 : getJointIndex(skinCluster:update , jointName )      
 #update 5/9/2019 : browDown_jnt, browTz weight will get cut by browUp weight
 #update 10/25/2017 : browUp/Dn , browWide_jnt setup
@@ -492,7 +481,7 @@ def faceWeightCalculateX():
             
         vtxVal= browUpWgt[x]-browTZWgt[x]
         if vtxVal<0:
-            print vtxVal
+
             browTZWgt[x] = browUpWgt[x]
       
         if browDnWgt[x]>1:
@@ -1393,58 +1382,54 @@ def copyExportEyeSkinWeights():
 '''
 def eyeWeightCalculate():   
     
-	eyeLidGeo = cmds.getAttr( "lidFactor.eyelidGeo" )
-	eyeLen = cmds.polyEvaluate( eyeLidGeo, v = 1)
-	eyeLidSkin =mel.eval("findRelatedSkinCluster %s"%eyeLidGeo )
-	eyeBlinkWgt =cmds.getAttr ( "eyeBlink_cls.wl[1].w[0:%s]"%str(eyeLen-1))
-	eyeWideWgt = cmds.getAttr ( "eyeWide_cls.wl[1].w[0:%s]"%str(eyeLen-1))
-	headSkelID = getJointIndex( eyeLidSkin,'headSkel_jnt' )	
-	valStr = ''
-	cmds.skinPercent( eyeLidSkin, eyeLidGeo+'.vtx[0:%s]'%(eyeLen-1), nrm=1, tv = ['headSkel_jnt',1] )
-	for i in range( eyeLen ):
-		if eyeBlinkWgt[i]>1:
-			print eyeBlinkWgt[i]
-			eyeBlinkWgt[i] = 1            
-		if eyeWideWgt[i]>1:
-			eyeWideWgt[i] = 1                        
-		vtxVal= eyeWideWgt[i]-eyeBlinkWgt[i]
-		if vtxVal<0:
-			print vtxVal
-			eyeBlinkWgt[i] = eyeWideWgt[i]
+    eyeLidGeo = cmds.getAttr( "lidFactor.eyelidGeo" )
+    eyeLen = cmds.polyEvaluate( eyeLidGeo, v = 1)
+    eyeLidSkin =mel.eval("findRelatedSkinCluster %s"%eyeLidGeo )
+    eyeBlinkWgt =cmds.getAttr ( "eyeBlink_cls.wl[1].w[0:%s]"%str(eyeLen-1))
+    eyeWideWgt = cmds.getAttr ( "eyeWide_cls.wl[1].w[0:%s]"%str(eyeLen-1))
+    headSkelID = getJointIndex( eyeLidSkin, 'headSkel_jnt' )
+    valStr = ''
+    cmds.skinPercent( eyeLidSkin, eyeLidGeo+'.vtx[0:%s]'%(eyeLen-1), nrm=1, tv = ['headSkel_jnt',1] )
+    for i in range( eyeLen ):
+        if eyeBlinkWgt[i]>1:
+            print eyeBlinkWgt[i]
+            eyeBlinkWgt[i] = 1
+        if eyeWideWgt[i]>1:
+            eyeWideWgt[i] = 1
+        vtxVal= eyeWideWgt[i]-eyeBlinkWgt[i]
+        if vtxVal<0:
+            print vtxVal
+            eyeBlinkWgt[i] = eyeWideWgt[i]
 
-		tmpVal = 1 - eyeWideWgt[i]
-		print tmpVal
-		valStr += str(tmpVal)+" "	
-			    
-	commandStr = ("setAttr -s "+str(eyeLen)+ " " + eyeLidSkin + ".wl[0:"+str(eyeLen-1)+"].w["+headSkelID+"] "+ valStr);
-	mel.eval (commandStr)
+        tmpVal = 1 - eyeWideWgt[i]
+        print tmpVal
+        valStr += str(tmpVal)+" "
+
+    commandStr = ("setAttr -s "+str(eyeLen)+ " " + eyeLidSkin + ".wl[0:"+str(eyeLen-1)+"].w["+headSkelID+"] "+ valStr);
+    mel.eval (commandStr)
+
+    #get the xml file for skinWeight ( brow/ eyeLid / lip )
+    dataPath = cmds.fileDialog2(fileMode=3, caption="set directory")
+
+    if os.path.exists(dataPath[0] + '/eyeLidGeoSkin.xml'):
+        eyeLidSkinWeight = ET.parse( dataPath[0] + '/eyeLidGeoSkin.xml')
+        rootEyeLidSkin = eyeLidSkinWeight.getroot()
+        blinkJnts = cmds.ls("l_*LidBlink*_jnt", type = "joint" )
+        eyeTipList = lastJntOfChain( blinkJnts )
+        for c in range(2, len(rootEyeLidSkin)-2 ):
+            eyeLidJnt = rootEyeLidSkin[c].attrib['source']
+            if eyeLidJnt in eyeTipList:
+                eyeTipJnt = eyeLidJnt
+                blinkJnt = cmds.listRelatives(cmds.listRelatives(eyeTipJnt, p=1)[0], p=1)[0]
+                eyeWideJnt = blinkJnt.replace("Blink", "Wide")
+                wideJntID = getJointIndex( eyeLidSkin, eyeWideJnt )
+                blinkJntID = getJointIndex( eyeLidSkin, eyeTipJnt )
+                for dict in rootEyeLidSkin[c]:
+                    vertID = int(dict.attrib['index'])
+                    weight= float(dict.attrib['value'])
+                    cmds.setAttr ( eyeLidSkin + '.wl['+ str(vertID) + "].w[" + str(blinkJntID)+ "]", ( min(1, eyeBlinkWgt[vertID]) * weight) )
+                    cmds.setAttr ( eyeLidSkin + '.wl['+ str(vertID) + "].w[" + str(wideJntID) + "]", ( max( eyeWideWgt[vertID] - eyeBlinkWgt[vertID], 0 )* weight) )
 	
-	#get the xml file for skinWeight ( brow/ eyeLid / lip )
-	dataPath = cmds.fileDialog2(fileMode=3, caption="set directory")
-    	
-	if os.path.exists(dataPath[0] + '/eyeLidGeoSkin.xml'):      
-		eyeLidSkinWeight = ET.parse( dataPath[0] + '/eyeLidGeoSkin.xml')
-		rootEyeLidSkin = eyeLidSkinWeight.getroot()
-		blinkJnts = cmds.ls("l_*LidBlink*_jnt", type = "joint" )
-		eyeTipList = lastJntOfChain( blinkJnts ) 
-		for c in range(2, len(rootEyeLidSkin)-2 ):
-		    eyeLidJnt = rootEyeLidSkin[c].attrib['source']
-		    if eyeLidJnt in eyeTipList:
-				eyeTipJnt = eyeLidJnt
-				blinkJnt = cmds.listRelatives(cmds.listRelatives(eyeTipJnt, p=1)[0], p=1)[0]
-				eyeWideJnt = blinkJnt.replace("Blink", "Wide")
-				wideJntID = getJointIndex( eyeLidSkin, eyeWideJnt )
-				blinkJntID = getJointIndex( eyeLidSkin, eyeTipJnt )
-				for dict in rootEyeLidSkin[c]:
-					vertID = int(dict.attrib['index'])
-					weight= float(dict.attrib['value'])
-					cmds.setAttr ( eyeLidSkin + '.wl['+ str(vertID) + "].w[" + str(blinkJntID)+ "]", ( min(1, eyeBlinkWgt[vertID]) * weight) )
-					cmds.setAttr ( eyeLidSkin + '.wl['+ str(vertID) + "].w[" + str(wideJntID) + "]", ( max( eyeWideWgt[vertID] - eyeBlinkWgt[vertID], 0 )* weight) )
-	
-
-
-
-
 
 
 # new name should be given
@@ -1709,7 +1694,7 @@ def copyClusterWgt(sdCls, ddCls):
 def exportClsWgt():
     #pathProject = cmds.workspace(  q=True, rd = True )
     dataPath = cmds.fileDialog2(fileMode=3, caption="set directory")
-    #cmds.file( filename[0], i=True );
+    #cmds.file( filename[0], index=True );
     if "clusterWeight" not in dataPath[0]:
         i = 0
         while os.path.isdir(dataPath[0] + "/clusterWeight%s" % i):   
@@ -1800,19 +1785,19 @@ def copyCurveShapes():
     scCv = cmds.ls(crvSel[0]+".cv[*]", l=1, fl=1 )
     dnCv = cmds.ls(crvSel[1]+".cv[*]", l=1, fl=1 )
     if len(scCv) == len( dnCv ):
-        for i in range(len(dnCv)):
-            scPos = cmds.xform(scCv[i], q=1, ws=1, t=1 )
-            cmds.setAttr( dnCv[i]+".xValue", scPos[0])
-            cmds.setAttr( dnCv[i]+".yValue", scPos[1])
-            cmds.setAttr( dnCv[i]+".zValue", scPos[2])   
+        for index in range(len(dnCv)):
+            scPos = cmds.xform(scCv[index], q=1, ws=1, t=1 )
+            cmds.setAttr( dnCv[index]+".xValue", scPos[0])
+            cmds.setAttr( dnCv[index]+".yValue", scPos[1])
+            cmds.setAttr( dnCv[index]+".zValue", scPos[2])   
     
     else:
         increm=1.0/(len(dnCv)-1)
-        for i, dnVtx in enumerate( dnCv ):
-            dnPOC = cmds.shadingNode ( 'pointOnCurveInfo', asUtility=True, n = 'dnPOC'+ str(i+1).zfill(2))
+        for index, dnVtx in enumerate( dnCv ):
+            dnPOC = cmds.shadingNode ( 'pointOnCurveInfo', asUtility=True, n = 'dnPOC'+ str(index+1).zfill(2))
             cmds.connectAttr ( crvSel[0] + ".worldSpace",  dnPOC + '.inputCurve')
     	    cmds.setAttr ( dnPOC + '.turnOnPercentage', 1 )
-    	    cmds.setAttr ( dnPOC + '.parameter', increm *i )	    
+    	    cmds.setAttr ( dnPOC + '.parameter', increm *index )	    
     	
             xyz = cmds.getAttr(dnPOC+".position" )
             cmds.setAttr( dnVtx+".xValue", xyz[0][0] )
@@ -1878,19 +1863,19 @@ def mirrorCurveShape():
             
     leng = len(mrrCv)
     if leng == len(dnCvs):
-        for i in range(leng ):
-            scPos = cmds.xform(mrrCv[i], q=1, ws=1, t=1 )
-            cmds.setAttr( dnCvs[i]+".xValue", scPos[0] )
-            cmds.setAttr( dnCvs[i]+".yValue", scPos[1] )
-            cmds.setAttr( dnCvs[i]+".zValue", scPos[2] )
+        for index in range(leng ):
+            scPos = cmds.xform(mrrCv[index], q=1, ws=1, t=1 )
+            cmds.setAttr( dnCvs[index]+".xValue", scPos[0] )
+            cmds.setAttr( dnCvs[index]+".yValue", scPos[1] )
+            cmds.setAttr( dnCvs[index]+".zValue", scPos[2] )
     
     else:
         increm=1.0/(len(dnCvs)-1)
-        for i, dnVtx in enumerate( dnCvs ):
-            dnPOC = cmds.shadingNode ( 'pointOnCurveInfo', asUtility=True, n = 'dnPOC'+ str(i+1).zfill(2))
+        for index, dnVtx in enumerate( dnCvs ):
+            dnPOC = cmds.shadingNode ( 'pointOnCurveInfo', asUtility=True, n = 'dnPOC'+ str(index+1).zfill(2))
             cmds.connectAttr ( mrrCv + ".worldSpace",  dnPOC + '.inputCurve')
     	    cmds.setAttr ( dnPOC + '.turnOnPercentage', 1 )
-    	    cmds.setAttr ( dnPOC + '.parameter', increm *i )	    
+    	    cmds.setAttr ( dnPOC + '.parameter', increm *index )	    
     	
             xyz = cmds.getAttr(dnPOC+".position" )
             cmds.setAttr( dnVtx+".xValue", xyz[0][0] )
@@ -1941,11 +1926,11 @@ def mirrorCurveShape( ):
                 crvShape = cmds.listRelatives( scCrv, c=1, s=1, ni =1 )[0] 
                 cmds.connectAttr ( crvShape + ".worldSpace",  dnPOC + '.inputCurve')
                 cmds.setAttr ( dnPOC + '.turnOnPercentage', 1 )
-                cmds.setAttr ( dnPOC + '.parameter', increm *i )        	
+                cmds.setAttr ( dnPOC + '.parameter', increm *index )        	
                 xyz = cmds.getAttr(dnPOC+".position" )
-                cmds.setAttr( dnCvs[dnLeng-i-1]+".xValue", -xyz[0][0] )
-                cmds.setAttr( dnCvs[dnLeng-i-1]+".yValue", xyz[0][1] )
-                cmds.setAttr( dnCvs[dnLeng-i-1]+".zValue", xyz[0][2] )'''	
+                cmds.setAttr( dnCvs[dnLeng-index-1]+".xValue", -xyz[0][0] )
+                cmds.setAttr( dnCvs[dnLeng-index-1]+".yValue", xyz[0][1] )
+                cmds.setAttr( dnCvs[dnLeng-index-1]+".zValue", xyz[0][2] )'''
                 
     elif scDirection*dnDirection < 0:            
   
@@ -1964,13 +1949,13 @@ def mirrorCurveShape( ):
         print "sitting on X X or -X -X"
         if scDirection*dnDirection > 0: 
             if scLeng == dnLeng:
-                for i in range( scLeng ):
-                    scPos = cmds.xform(scCvs[i], q=1, os=1, t=1 )
-                    scEndPos = cmds.xform(scCvs[dnLeng-i-1], q=1, os=1, t=1 )
-                    #scXPos = cmds.xform(scCvs[dnLeng-i-1], q=1, os=1, t=1 )
-                    cmds.setAttr( dnCvs[dnLeng-i-1]+".xValue", scEndPos[0] )
-                    cmds.setAttr( dnCvs[dnLeng-i-1]+".yValue", scPos[1] )
-                    cmds.setAttr( dnCvs[dnLeng-i-1]+".zValue", scPos[2] )
+                for index in range( scLeng ):
+                    scPos = cmds.xform(scCvs[index], q=1, os=1, t=1 )
+                    scEndPos = cmds.xform(scCvs[dnLeng-index-1], q=1, os=1, t=1 )
+                    #scXPos = cmds.xform(scCvs[dnLeng-index-1], q=1, os=1, t=1 )
+                    cmds.setAttr( dnCvs[dnLeng-index-1]+".xValue", scEndPos[0] )
+                    cmds.setAttr( dnCvs[dnLeng-index-1]+".yValue", scPos[1] )
+                    cmds.setAttr( dnCvs[dnLeng-index-1]+".zValue", scPos[2] )
             
             else:
                 cmds.confirmDialog( title='Confirm', message='select curves with same number of cvs' )
@@ -1978,12 +1963,12 @@ def mirrorCurveShape( ):
         elif scDirection*dnDirection < 0:            
                     
             if scLeng == dnLeng:
-                for i in range( scLeng ):
-                    scPos = cmds.xform(scCvs[i], q=1, os=1, t=1 )
-                    scEndPos = cmds.xform(scCvs[dnLeng-i-1], q=1, os=1, t=1 )
-                    cmds.setAttr( dnCvs[i]+".xValue", scEndPos[0] )
-                    cmds.setAttr( dnCvs[i]+".yValue", scPos[1] )
-                    cmds.setAttr( dnCvs[i]+".zValue", scPos[2] )
+                for index in range( scLeng ):
+                    scPos = cmds.xform(scCvs[index], q=1, os=1, t=1 )
+                    scEndPos = cmds.xform(scCvs[dnLeng-index-1], q=1, os=1, t=1 )
+                    cmds.setAttr( dnCvs[index]+".xValue", scEndPos[0] )
+                    cmds.setAttr( dnCvs[index]+".yValue", scPos[1] )
+                    cmds.setAttr( dnCvs[index]+".zValue", scPos[2] )
             
             else:
                 cmds.confirmDialog( title='Confirm', message='select curves with same number of cvs' )'''

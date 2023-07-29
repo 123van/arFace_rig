@@ -14,3 +14,5 @@ window.show()  # IMPORTANT!!!!! Windows are hidden by default.
 
 # Start the event loop.
 app.exec()
+
+print "let's test"

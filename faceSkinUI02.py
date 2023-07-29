@@ -6,20 +6,25 @@ file.zeroOutCluster()
 '''
 
 import maya.cmds as cmds
-import os
+from twitchScript.brow import browRig
+reload(browRig)
+from twitchScript.face import face_utils
+#reload(face_utils)
+
 from twitchScript import faceSkinFunction
 reload(faceSkinFunction)
 from twitchScript import squachSetup
-reload(squachSetup)
+#reload(squachSetup)
 from twitchScript import twitchPanelConnect
-reload(twitchPanelConnect)
+#reload(twitchPanelConnect)
 from twitchScript import blendShapeMethods
-reload(blendShapeMethods)
+#reload(blendShapeMethods)
 from twitchScript import faceCompFunction
 reload(faceCompFunction)
 
 def faceSkinUI():
 
+    browClass = browRig.BrowRig()
     #check to see if window exists
     if cmds.window ('faceSkinUI', exists = True):
         cmds.deleteUI( 'faceSkinUI')
@@ -87,16 +92,6 @@ def faceSkinUI():
     cmds.text( label = '')
     cmds.text( label = '')
     
-    cmds.text( label = '')
-    cmds.text( label = 'select browVtx in order')
-    cmds.text( label = '/store in browFactor')
-    cmds.text( label = '')
-    
-    cmds.text( label = '')
-    cmds.button( label = 'browVerts',bgc=[.42,.5,.60], command = browVerts, ann = "store in order of vert tx value" )
-    cmds.button( label = 'select browVerts',bgc=[.42,.5,.60], command = selectBrowVerts )
-    cmds.text( label = '')
-    
     spaceBetween(1,4)
            
     cmds.text( label = '')
@@ -104,21 +99,27 @@ def faceSkinUI():
     cmds.text( label = '/ direction vert on loop')
     cmds.text( label = '')
     
-    cmds.text( label = 'Pick Eye or Lip! :', fn = "boldLabelFont" )
-    cmds.optionMenu('eye_lip', bgc=[0,0,0], changeCommand=printNewMenuItem )
+    cmds.text( label = 'Pick One! :', fn = "boldLabelFont" )
+    cmds.optionMenu('eye_lip_brow', bgc=[0,0,0], changeCommand=printNewMenuItem )
+    cmds.menuItem( label='brow' )
     cmds.menuItem( label='eye' )
-    cmds.menuItem( label='lip' )
-    cmds.button( label = 'orderedVerts', bgc=[.42,.5,.60], command = orderedUpLoVert )
+    cmds.menuItem(label='lip')
+    cmds.text( label = '' )
     cmds.text( label = '')
-    
-    cmds.text( label = '            arFace verts')
-    cmds.text( label = 'stored in order               ')
-    cmds.button( label = 'arfOrderedVerts', bgc=[.42,.5,.60], command = arFaceOrderedVert_upLo )
+
+    cmds.text( label = 'Store In Order     ')
+    cmds.button( label = 'orderedVerts', bgc=[.42,.5,.60], command = orderedVert_upLo )
+    cmds.button(label='store manual selection', bgc=[.42, .5, .60], command=storeManualSelection)
     cmds.text( label = '')
-    
-    cmds.text( label = 'Select:    ', fn = "boldLabelFont" )
-    cmds.button( label = 'up Verts', bgc=[.42,.5,.60], command = upVertSel )
-    cmds.button( label = 'low Verts', bgc=[.42,.5,.60], command = lowVertSel )
+
+    cmds.text( label = 'For Brow :          ')
+    cmds.button( label = 'select Brow Vertices', bgc=[.42,.5,.60], command = selectBrowVerts )
+    cmds.text( label = '')
+    cmds.text( label = '')
+
+    cmds.text( label = 'For Eye / Lip :    ')
+    cmds.button( label = 'Upper Vertices', bgc=[.42,.5,.60], command = upVertSel )
+    cmds.button( label = 'Lower Vertices', bgc=[.42,.5,.60], command = lowVertSel )
     cmds.text( label = '')
     
     cmds.separator( h = 15)    
@@ -162,28 +163,32 @@ def faceSkinUI():
     cmds.text( label = '')
     
     cmds.text( label = '')
-    cmds.text( label = '')
-    cmds.text( label = 'select 2 curves' )
-    cmds.text( label = '')
-    
-    cmds.text( label = 'brow joint:' )
-    cmds.button( label = 'browJoints', bgc=[.42,.5,.60], command = browJoints )
-    cmds.button( label = 'attach curves', bgc=[.42,.5,.60], command = attachCurves )
+    cmds.text( label = 'Number of Ctl')
+    cmds.text( label = 'Number of Jnt : vtx Multi' )
     cmds.text( label = '')
     
-    cmds.text( label = '')
-    cmds.text( label = 'select polyEdgeCrv & ctl')
-    cmds.text( label = '(or not)"                             '  )
-    cmds.text( label = '')
-    
-    cmds.text( label = 'brow ctls:')
+    cmds.text( label = 'Select:' )
     cmds.optionMenu('numOfBrowCtl', bgc=[.42,.5,.60], changeCommand= printNewMenuItem )
     cmds.menuItem( label='7' )
     cmds.menuItem( label='9' )
     cmds.menuItem( label='11' )
-    cmds.button( label = 'connect Brow ctrl', bgc=[.42,.5,.60], command = connectBrowCtrls )
+    cmds.menuItem( label='13')
+    cmds.optionMenu('jointMultiple', bgc=[.42,.5,.60], changeCommand= printNewMenuItem )
+    cmds.menuItem( label='1' )
+    cmds.menuItem( label='2' )
+    cmds.menuItem( label='3' )
+    cmds.menuItem(label='Every')
     cmds.text( label = '')
-    #cmds.button( label = 'twitch Brow ctrl', bgc=[.42,.5,.60], command = connectBrowCtrls )
+    
+    cmds.text( label = '')
+    cmds.text( label = 'select ctl')
+    cmds.text( label = ' change number : Ctl/Multi')
+    cmds.text( label = '')
+    
+    cmds.text( label = '')
+    cmds.button(label='Brow Rig', bgc=[.42, .5, .60], command= browRigBuild )
+    cmds.button( label = 'rebuild BrowRig', bgc=[.42,.5,.60], command = rebuildBrowRig )
+    cmds.text( label = '')
     cmds.text( label = 'New', fn = "boldLabelFont", height= 20 )
     cmds.button( label = 'browWideJnt', bgc=[.42,.5,.60], command = browWideJnt )     
     cmds.button( label = 'browFix(up/down)', bgc=[.42,.5,.60], command = browUpDownReverse ) 
@@ -1167,7 +1172,6 @@ def headGeo( *pArgs ):
 def setupLocator(*pArgs):
     faceCompFunction.setupLocator()
 
-
 def plugNewHeadShape(*pArgs):
     mySel = cmds.ls( os =1, typ = "transform")
     plugHead = mySel[0]
@@ -1253,26 +1257,49 @@ def browVerts( *pArgs ):
     
 def selectBrowVerts(*pArgs):
     faceCompFunction.selectBrowVerts()
-    
-    
-def orderedUpLoVert( *pArgs ):
-    currentName = cmds.optionMenu('eye_lip', query=True, value=True) 
-    faceCompFunction.orderedVert_upLo(currentName)
 
-def arFaceOrderedVert_upLo( *pArgs ):
-    currentName = cmds.optionMenu('eye_lip', query=True, value=True) 
-    faceCompFunction.rnkOrderedVert_upLo(currentName)
+def storeManualSelection(*pArgs):
+
+    part = cmds.optionMenu('eye_lip_brow', query=True, value=True)
+    selectedVtx = cmds.ls(os=1, fl=1)
+    if part == "brow":
+        vtxLength = len(selectedVtx)
+        if not vtxLength in [4, 5, 6, 7]:
+            raise RuntimeError("number of vertices should be 4, 5, 6, 7")
+
+        faceCompFunction.storeManualSelection(selectedVtx)
+        numOfCtl = vtxLength*2-1
+        cmds.optionMenu("numOfBrowCtl", e=1, value=str(numOfCtl))
+
+
+def orderedVert_upLo( *pArgs ):
+    currentName = cmds.optionMenu('eye_lip_brow', query=True, value=True)
+    if currentName == "brow":
+        faceCompFunction.browOrderedVertices()
+        selectedVtx = cmds.getAttr("browFactor.browVerts")
+        # check if selected vertices are on the edgeLoop
+        edgeLoop = face_utils.Util.checkEdgeLoopWithSelectedVtx(selectedVtx)
+        if edgeLoop:
+            cmds.optionMenu("jointMultiple", e=1, value="Every")
+    else:
+        faceCompFunction.orderedVert_upLo(currentName)
     
 def upVertSel( *pArgs ):
-    eyeLip = cmds.optionMenu('eye_lip', query=True, value=True)
+    eyeLip = cmds.optionMenu('eye_lip_brow', query=True, value=True)
     faceCompFunction.upVertSel( eyeLip )
 
 def lowVertSel( *pArgs ):
-    eyeLip = cmds.optionMenu('eye_lip', query=True, value=True)
+    eyeLip = cmds.optionMenu('eye_lip_brow', query=True, value=True)
     faceCompFunction.loVertSel( eyeLip )
 
-def browJoints(*pArgs):
-    faceCompFunction.browJoints()
+def browRigBuild(*pArgs):
+    myCtl = cmds.ls(sl=1, type ="transform")
+    if myCtl:
+        myCtl = myCtl[0]
+    jntMultiple= cmds.optionMenu("jointMultiple", query=True, value=True)
+    browClass = browRig.BrowRig()
+    numberOfCtl = cmds.optionMenu("numOfBrowCtl", query=True, value=True)
+    browClass.build( int(numberOfCtl), jntMultiple, myCtl)
  
 def attachCurves(*pArgs):
     
@@ -1286,27 +1313,19 @@ def browWideJnt(*pArgs):
     faceCompFunction.browWideJnt()
     
 #select "ctl guide curve", "controller"(both or either or none) 
-def connectBrowCtrls(*pArgs):
-    size = cmds.floatField( 'ctl_size', q=1, value = 1 ) 
-    offset = cmds.floatField( 'ctl_offset', q=1, value = 1 )
+def rebuildBrowRig(*pArgs):
+
     numOfCtl = cmds.optionMenu( 'numOfBrowCtl', query=True, value=True )
+    jntMultiple = cmds.optionMenu("jointMultiple", query=True, value=True)
     mySel = cmds.ls(sl=1, typ ="transform")
     myCtl = ""
-    polyEdgeCrv = ""
     if mySel:
-        if len(mySel) == 2:
-            polyEdgeCrv = mySel[0]
-            myCtl = mySel[1]
-            
-        elif len( mySel ) == 1:
-            cnnt = cmds.listHistory( mySel[0], pdo=1, lv=2  )
-            if cnnt:
-                polyEdgeCrv = mySel[0]
-            else:
-                myCtl = mySel[0]
-                  
-    crv = faceCompFunction.browCtl_onHead( int(numOfCtl), offset, size, polyEdgeCrv, myCtl )        
-    faceCompFunction.connectBrowCtrls( int(numOfCtl), size, offset, crv )    
+        myCtl = mySel[0]
+
+    browRebuild = browRig.BrowRig()
+    browRebuild.rebuildCtl(int(numOfCtl), jntMultiple, myCtl)
+    #crv = faceCompFunction.browCtl_onHead( int(numOfCtl), offset, size, polyEdgeCrv, myCtl )
+    #faceCompFunction.connectBrowCtrls( int(numOfCtl), size, offset, crv )
 
         
 def browUpDownReverse(*pArgs):
@@ -1506,10 +1525,7 @@ def curve_halfVerts( *pArgs ):
     item = cmds.optionMenu('mapName', query=True, value=True )
     character = cmds.optionMenu('crvCharacterName', query=True, value=True )
     name = item + character
-    trackSelectionOrder = cmds.selectPref( q=1, tso=1 )
-    if trackSelectionOrder == False:
-        cmds.confirmDialog( title='Confirm', message='the trackSelectionOrder should be on in preference' )
-    
+
     myVert = cmds.ls( os=1, fl=1 )  
     faceCompFunction.curve_halfVerts( myVert, name, openClose, degree )
    

@@ -34,7 +34,8 @@ def copyCurrnetCrv(name):
         cmds.setAttr (cvJnt + ".overrideColor", ctlColor )
         cmds.delete (cvCtl)
 		cmds.parent(cvCtlP, indiGrp)
-    #디포머를 이용해야 하기 때문에 rCrv를 instance 로 쓸 수 없다. 
+
+    #디포머를 이용해야 하기 때문에 rCrv를 instance 로 쓸 수 없다.
     cmds.skinCluster( cvJntList, "l" + name + "_crv", toSelectedBones=1)
     cmds.skinCluster( cvJntList, "r" + name + "_crv", toSelectedBones=1)
     ctlPList = cmds.listRelatives( cvJntList, ap =1, type = "transform") 
