@@ -464,7 +464,7 @@ def indiCrvSetup(name):
         cornerMult = cmds.shadingNode ( 'multiplyDivide', asUtility=True, n = name +'Corner_mult' )
         dampMult = cmds.shadingNode ( 'multiplyDivide', asUtility=True, n = name + 'damp_mult' )
         txAvg = cmds.shadingNode ( 'plusMinusAverage', asUtility=True, n = name + 'TX_plus')
-        #endAvg = cmds.shadingNode ( 'plusMinusAverage', asUtility=True, n = name + 'TY' + str(i) +'_plus')  
+        #endAvg = cmds.shadingNode ( 'plusMinusAverage', asUtility=True, n = name + 'TY' + str(index) +'_plus')
         # corner tx value
         cmds.connectAttr ( midLoJnt+ '.tx', cornerMult+ '.input1X' )  
         cmds.connectAttr ( midLoJnt+ '.ty', cornerMult+ '.input1Y' )  

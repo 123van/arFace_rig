@@ -672,7 +672,7 @@ def faceSkinUI():
     cmds.separator( h = 15)    
     cmds.separator( h = 15)
     cmds.separator( h = 15)    
-    cmds.text( label = 'joints length:')
+    cmds.text( label = 'joints browLength:')
     jntLen = cmds.intField( 'joint_length', value = 12 )
     cmds.button( label = 'squachSetup', command = squachFunction )
     cmds.text( label = 'select objects!')

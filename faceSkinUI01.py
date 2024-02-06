@@ -728,7 +728,7 @@ def faceSkinUI():
     cmds.text( label = '')
     cmds.text( label = '')
     cmds.text( label = '')
-    cmds.text( label = 'select baseGeo :  ', fn = "boldLabelFont")
+    cmds.text( label = 'select headGeo :  ', fn = "boldLabelFont")
     cmds.text( label = 'twitch update weight ', fn = "boldLabelFont")
     cmds.text( label = 'Set ctls 1 !!', fn = "boldLabelFont" )
     cmds.optionMenu('split_range', bgc=[0,0,0], changeCommand= printNewMenuItem )

@@ -33,7 +33,7 @@ def headGeo():
     faceGeo = cmds.ls(sl=1, type = "transform")[0]
     if cmds.attributeQuery("headGeo", node = "helpPanel_grp", exists=1)==False:
         cmds.addAttr( "helpPanel_grp", ln ="headGeo", dt = "string"  )
-    cmds.setAttr("helpPanel_grp.headGeo", faceGeo, type= "string"  ) 
+    cmds.setAttr("helpPanel_grp.headGeo", faceGeo, type= "string"  )
 
     
 #store brow vertices in browFactor( selection order: center to left !! )
@@ -3975,7 +3975,7 @@ def getGeo_uvParam( geo, obj ):
 #miscellaneous_____________________________________________________________________________________________________________
 
 
-# select headGeo(or polyToCurve) and ctls( or parent👈) that are on the skin 
+# select headGeo(or polyToCurve) and ctls( or parent👈) that are on the skin
 def stickCtlToFace( obj, ctls ):
 
     objShp = cmds.listRelatives( obj, c=1, ni =1, s=1 )[0]

@@ -244,11 +244,11 @@ def ctlSetLimits( posTx, negTx, posTy, negTy, posTz, negTz ):
         '''    
         #set rotate limits
         if cmds.getAttr(c +'.rotateX', lock =1 ) == False:
-            cmds.transformLimits( ctls[i], rotateX = ( -rotLimitX, rotLimitX ), erx =(1,1) )
+            cmds.transformLimits( ctls[index], rotateX = ( -rotLimitX, rotLimitX ), erx =(1,1) )
         if cmds.getAttr(c +'.rotateX', lock =1 ) == False:
-            cmds.transformLimits( ctls[i], rotateY = ( -rotLimitY, rotLimitY), ery =(1,1) )        
+            cmds.transformLimits( ctls[index], rotateY = ( -rotLimitY, rotLimitY), ery =(1,1) )        
         if cmds.getAttr(c +'.rotateX', lock =1 ) == False:
-            cmds.transformLimits( ctls[i], rotateZ = ( -rotLimitZ, rotLimitZ ), erz =(1,1) )''' 
+            cmds.transformLimits( ctls[index], rotateZ = ( -rotLimitZ, rotLimitZ ), erz =(1,1) )'''
 
 
 #ctlSetLimits( .5, -.5, .8, -.6, 0, 0 )

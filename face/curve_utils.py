@@ -744,6 +744,8 @@ def seriesOfEdgeLoopCrv(lipEye, nature, vtxList):
     Returns: closed curve
 
     """
+    if not cmds.objExists("surfaceMap_grp"):
+        cmds.group(em=1, n="surfaceMap_grp", p="dumpBin_grp")
 
     if lipEye == 'eye':
         part = "lid"
@@ -756,8 +758,8 @@ def seriesOfEdgeLoopCrv(lipEye, nature, vtxList):
     if len(vtxList) <= 1:
         raise RuntimeError('check the vertices selection!!')
 
-    if not vtxList[0].split(".")[0] == cmds.getAttr("helpPanel_grp.headGeo"):
-        raise RuntimeError('wrong geo selected')
+    # if not vtxList[0].split(".")[0] == cmds.getAttr("helpPanel_grp.headGeo"):
+    #     raise RuntimeError('wrong geo selected')
 
     orderSel = orderedVerts_selection(vtxList)
 
@@ -802,18 +804,18 @@ def symmetrizeOpenCrv(crvSel, direction):
         for i in range(cvLength / 2):
             cv = cvList[cvLength - i - 1]
 
-            cvPos = cmds.xform(cv, ws=1, q=1, t=1)
+            cvPos = cmds.xform(cv, os=1, q=1, t=1)
 
-            cmds.xform(cvList[i], ws=1, t=(-cvPos[0], cvPos[1], cvPos[2]))
+            cmds.xform(cvList[i], os=1, t=(-cvPos[0], cvPos[1], cvPos[2]))
 
     else:
         print("right cv to left cv")
 
         for i in range(cvLength / 2):
             cv = cvList[i]
-            cvPos = cmds.xform(cv, ws=1, q=1, t=1)
+            cvPos = cmds.xform(cv, os=1, q=1, t=1)
 
-            cmds.xform(cvList[cvLength - i - 1], ws=1, t=(-cvPos[0], cvPos[1], cvPos[2]))
+            cmds.xform(cvList[cvLength - i - 1], os=1, t=(-cvPos[0], cvPos[1], cvPos[2]))
 
 
 # curve should have center cv[ 0, y, z]
@@ -857,11 +859,11 @@ def symmetrizeCloseCrv(crvSel, direction):
         opphalf = numList[endNum + 1:] + numList[:int(centerCV[0])]
 
         # curve direction( --> )
-        if cmds.xform(crvCvs[startNum], q=1, ws=1, t=1)[0] > 0:
+        if cmds.xform(crvCvs[startNum], q=1, os=1, t=1)[0] > 0:
             leftNum = halfNum
             rightNum = opphalf[::-1]
         # curve direction( <-- )
-        elif cmds.xform(crvCvs[startNum], q=1, ws=1, t=1)[0] < 0:
+        elif cmds.xform(crvCvs[startNum], q=1, os=1, t=1)[0] < 0:
             leftNum = opphalf
             rightNum = halfNum[::-1]
 
@@ -872,11 +874,11 @@ def symmetrizeCloseCrv(crvSel, direction):
         opphalf = numList[endNum + 1:int(centerCV[0])]
 
         # curve direction( --> )
-        if cmds.xform(crvCvs[startNum], q=1, ws=1, t=1)[0] > 0:
+        if cmds.xform(crvCvs[startNum], q=1, os=1, t=1)[0] > 0:
             leftNum = opphalf[::-1]
             rightNum = halfNum
         # curve direction( <-- )
-        elif cmds.xform(crvCvs[startNum], q=1, ws=1, t=1)[0] < 0:
+        elif cmds.xform(crvCvs[startNum], q=1, os=1, t=1)[0] < 0:
             leftNum = halfNum
             rightNum = opphalf[::-1]
 
@@ -886,16 +888,185 @@ def symmetrizeCloseCrv(crvSel, direction):
 
         for i in range(halfLength):
             pos = cmds.xform(crvCvs[leftNum[i]], q=1, ws=1, t=1)
-            cmds.xform(crvCvs[rightNum[i]], ws=1, t=(-pos[0], pos[1], pos[2]))
+            cmds.xform(crvCvs[rightNum[i]], os=1, t=(-pos[0], pos[1], pos[2]))
 
     else:
         print("right cv to left cv")
 
         for i in range(halfLength):
             pos = cmds.xform(crvCvs[rightNum[i]], q=1, ws=1, t=1)
-            cmds.xform(crvCvs[leftNum[i]], ws=1, t=(-pos[0], pos[1], pos[2]))
+            cmds.xform(crvCvs[leftNum[i]], os=1, t=(-pos[0], pos[1], pos[2]))
+
+def resetBStargetCrv(selCrvList):
+
+    for selCrv in selCrvList:
+
+        selCrvShp = cmds.listRelatives(selCrv, c=1)[0]
+        BS = cmds.listConnections(selCrvShp, d=1, s=0, type="blendShape")[0]
+
+        if not BS:
+            raise RuntimeError("select blendShape target curve")
+
+        tweak = [x for x in cmds.listHistory(BS, pdo=1) if cmds.nodeType(x) == 'tweak'][0]
+        origShp = [x for x in cmds.listHistory(tweak) if cmds.nodeType(x) == 'nurbsCurve'][0]
+
+        origCvs = cmds.ls('{}.cv[*]'.format(origShp), fl=1)
+        cvs = cmds.ls('{}.cv[*]'.format(selCrv), fl=1)
+        for cv, origCv in zip(cvs, origCvs):
+            print(cv, origCv)
+            xVal = cmds.getAttr('{}.xValue'.format(origCv))
+            yVal = cmds.getAttr('{}.yValue'.format(origCv))
+            zVal = cmds.getAttr('{}.zValue'.format(origCv))
+
+            xCnnt = cmds.listConnections('{}.xValue'.format(cv), s=1)
+            yCnnt = cmds.listConnections('{}.yValue'.format(cv), s=1)
+            zCnnt = cmds.listConnections('{}.zValue'.format(cv), s=1)
+            if xCnnt or yCnnt or zCnnt:
+                raise RuntimeError('{} value have connections!!'.format(cv))
+            else:
+                cmds.setAttr('{}.xValue'.format(cv), xVal)
+                cmds.setAttr('{}.yValue'.format(cv), yVal)
+                cmds.setAttr('{}.zValue'.format(cv), zVal)
 
 
+# select source curve first and target curve
+# mirror A crv for B crv
+def copyCurveShape(crvSel):
+
+    scCrv = crvSel[0]
+    tgtCrv = crvSel[1]
+
+    scCvs = cmds.ls(scCrv + ".cv[*]", l=1, fl=1)
+    dnCvs = cmds.ls(tgtCrv + ".cv[*]", l=1, fl=1)
+
+    scStart = cmds.xform(scCvs[0], q=1, os=1, t=1)
+    scEnd = cmds.xform(scCvs[-1], q=1, os=1, t=1)
+    # get sc curve u direction
+    scDirection = scEnd[0] - scStart[0]
+
+    dnStart = cmds.xform(dnCvs[0], q=1, os=1, t=1)
+    dnEnd = cmds.xform(dnCvs[-1], q=1, os=1, t=1)
+    # get curve u direction
+    dnDirection = dnEnd[0] - dnStart[0]
+
+    scLeng = len(scCvs)
+    dnLeng = len(dnCvs)
+
+    if not scLeng == dnLeng:
+        raise RuntimeError('select curves with same number of cvs')
+
+    if not scDirection * dnDirection > 0:
+        cmds.confirmDialog(title='Confirm', message="selected curves u-direction are opposite")
+
+    for i in range(scLeng):
+        scPos = cmds.xform(scCvs[i], q=1, os=1, t=1)
+
+        cmds.setAttr(dnCvs[i] + ".xValue", scPos[0])
+        cmds.setAttr(dnCvs[i] + ".yValue", scPos[1])
+        cmds.setAttr(dnCvs[i] + ".zValue", scPos[2])
+
+def mirrorCurveShape(crvSel):
+
+    scCrv = crvSel[0]
+    tgtCrv = crvSel[1]
+    scCvs = cmds.ls(scCrv + ".cv[*]", l=1, fl=1)
+    dnCvs = cmds.ls(tgtCrv + ".cv[*]", l=1, fl=1)
+
+    scStart = cmds.xform(scCvs[0], q=1, os=1, t=1)
+    scEnd = cmds.xform(scCvs[-1], q=1, os=1, t=1)
+    # get sc curve u direction
+    scDirection = scEnd[0] - scStart[0]
+
+    dnStart = cmds.xform(dnCvs[0], q=1, os=1, t=1)
+    dnEnd = cmds.xform(dnCvs[-1], q=1, os=1, t=1)
+    # get curve u direction
+    dnDirection = dnEnd[0] - dnStart[0]
+
+    scLeng = len(scCvs)
+    dnLeng = len(dnCvs)
+
+    if scDirection * dnDirection > 0:
+        if scLeng == dnLeng:
+            for i in range(scLeng):
+                scPos = cmds.xform(scCvs[i], q=1, os=1, t=1)
+
+                cmds.setAttr(dnCvs[dnLeng - i - 1] + ".xValue", -scPos[0])
+                cmds.setAttr(dnCvs[dnLeng - i - 1] + ".yValue", scPos[1])
+                cmds.setAttr(dnCvs[dnLeng - i - 1] + ".zValue", scPos[2])
+
+        else:
+            cmds.confirmDialog(title='Confirm', message='select curves with same number of cvs')
+
+    elif scDirection * dnDirection < 0:
+
+        if scLeng == dnLeng:
+            for i in range(scLeng):
+                scPos = cmds.xform(scCvs[i], q=1, os=1, t=1)
+
+                cmds.setAttr(dnCvs[i] + ".xValue", -scPos[0])
+                cmds.setAttr(dnCvs[i] + ".yValue", scPos[1])
+                cmds.setAttr(dnCvs[i] + ".zValue", scPos[2])
+
+        else:
+            cmds.confirmDialog(title='Confirm', message='select curves with same number of cvs')
 
 
+def copyCrvs_fromReference(crvSelList):
+    """
+    copy from referenced curves to the seleccted curves by name
+    """
+    crvs = cmds.ls(sl=1, type="transform")
+    for crv in crvs:
 
+        sourceCrv = cmds.ls("*:{}".format(crv))
+
+        if sourceCrv:
+            cmds.select(sourceCrv[0], r=1)
+            cmds.select(crv, add=1)
+            crvSel = cmds.ls(os=1 )
+            print(crvSel)
+            UnlockAll(crvSel)
+            copyCurveShape(crvSel)
+
+#arFace specific function( mirror the selected left crv to right)
+def mirrorCrvLeftToRight(crvSelList):
+
+    crvs = cmds.ls(sl=1, type="transform")
+    for crv in crvs:
+        '''
+        sourceCrv = cmds.ls("*:{}".format(crv))
+    
+        if sourceCrv:    
+            cmds.select(sourceCrv[0], r=1)
+            cmds.select(crv, add=1)
+            crvSel = cmds.ls(os=1 )
+            print(crvSel)
+            UnlockAll(crvSel)
+            curve_utils.copyCurveShape(crvSel)'''
+
+        if crv.startswith('l_'):
+            cmds.select(crv, r=1)
+            cmds.select(crv.replace('l_', 'r_'), add=1)
+            crvSel = cmds.ls(os=1, type="transform")
+            mirrorCurveShape(crvSel)
+
+        elif crv.startswith('r_'):
+            cmds.select(crv, r=1)
+            cmds.select(crv.replace('r_', 'l_'), add=1)
+            crvSel = cmds.ls(os=1, type="transform")
+            mirrorCurveShape(crvSel)
+
+
+def UnlockAll(objs):
+    locked = []
+    for obj in objs:
+        attrs = cmds.listAttr(obj)
+        for attr in attrs:
+            try:
+                attrObj = "{0}.{1}".format(obj, attr)
+                if cmds.getAttr(attrObj, lock=True):
+                    cmds.setAttr(attrObj, lock=0)
+                    locked.append(attrObj)
+            except ValueError:
+                continue
+    print(locked)

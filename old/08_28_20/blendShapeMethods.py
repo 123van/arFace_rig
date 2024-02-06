@@ -1554,7 +1554,7 @@ def bakeCrvDeltaBS( sourceCrv, targetCrv, name):
     print multList, numTgt
     comp = [0]
     for i in range( numTgt ):
-        # length of comp is different for each target because the vertexs that has none movement don't counts
+        # browLength of comp is different for each target because the vertexs that has none movement don't counts
         comp = cmds.getAttr(crvBS[0]+ '.inputTarget[0].inputTargetGroup[%s].inputTargetItem[6000].inputComponentsTarget'%str(i) )
         delta = cmds.getAttr(crvBS[0]+ '.inputTarget[0].inputTargetGroup[%s].inputTargetItem[6000].inputPointsTarget'%str(i) )
         newDelta = []

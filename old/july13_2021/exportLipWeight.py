@@ -24,10 +24,10 @@ def calExtraClsWgt():
     
     	#first calculate the mouth with lip and lipRoll
         mouthWgt.append( min(1, max(lipWgt[i], rollWgt[i])) )
-        '''if mouthWgt[i]<0:
-    	    mouthWgt[i] = 0
-    	mouthWgt[i] += rollWgt[i]
-    	if mouthWgt[i]>1: mouthWgt[i] = 1'''		
+        '''if mouthWgt[index]<0:
+    	    mouthWgt[index] = 0
+    	mouthWgt[index] += rollWgt[index]
+    	if mouthWgt[index]>1: mouthWgt[index] = 1'''
     
     	# filter out lip area by multiple (1 - mouth)
         jawOpenWgt[i] *= pow((1 - mouthWgt[i]),1)

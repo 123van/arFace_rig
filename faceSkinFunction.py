@@ -103,7 +103,7 @@ def genericController( ctlName, position, radius, shape, colorId ):
 
             
 def faceClusters():
-    headGeo = cmds.getAttr("helpPanel_grp.headGeo")  
+    headGeo = cmds.getAttr("helpPanel_grp.headGeo")
     #xmin ymin zmin xmax ymax zmax (face bounding box)
     facebbox = cmds.xform( headGeo, q=1, boundingBox =1 )
     rad = facebbox[3]/20.0
@@ -329,7 +329,7 @@ def tranToRot_mult( ctlJnt, ratio ):
 #create joint for cluster and ctrl
 #place ctlP for easy grab ( "faceLoc_grp"|"faceClsFrame" or "attachCtl_grp"|"midCtl_grp" )
 def clusterOnJoint( loc, clsName, ctlP, offset, rad, sect ):         
-    headGeo = cmds.getAttr("helpPanel_grp.headGeo") 
+    headGeo = cmds.getAttr("helpPanel_grp.headGeo")
     clsPos = cmds.xform ( loc, q= 1, ws =1 , t=1 )
     ctl = cmds.circle( d =1, n = clsName.replace( 'cls', 'onCtl') )
     null = cmds.duplicate( ctl[0], po=1, n = clsName.replace( 'cls', 'ctlP') )
@@ -359,7 +359,7 @@ def clusterOnJoint( loc, clsName, ctlP, offset, rad, sect ):
 #place ctlP for easy grab ( "faceLoc_grp| "faceClsFrame" or "attachCtl_grp"|"midCtl_grp" )
 def clusterForSkinWeight( loc, zDepth, clsName, ctlP, rad, sect, colorID ):       
     
-    headGeo = cmds.getAttr("helpPanel_grp.headGeo") 
+    headGeo = cmds.getAttr("helpPanel_grp.headGeo")
     clsPos = cmds.xform ( loc, q= 1, ws =1 , t=1 )
     clsRot = cmds.xform ( loc, q= 1, ws =1 , ro=1 )
     position = (clsPos[0], clsPos[1], zDepth )
@@ -1771,7 +1771,7 @@ def copyCurveSel():
         if ":" in sourceCrv:
             srcName = sourceCrv.split(":")
             targetCrv = srcName[-1][:-1]
-            print targetCrv
+
         else:
             targetCrv = sourceCrv[:-1]
             
@@ -1908,7 +1908,6 @@ def mirrorCurveShape( ):
     scBBox = cmds.xform(scCrv, q=1, bb=1 )
     dnBBox = cmds.xform(tgtCrv, q=1, bb=1 )
 
-    print "sitting on X -X or -X X"
     if scDirection*dnDirection > 0: 
         if scLeng == dnLeng:
             for i in range( scLeng ):
@@ -1920,18 +1919,7 @@ def mirrorCurveShape( ):
         
         else:
             cmds.confirmDialog( title='Confirm', message='select curves with same number of cvs' )
-            '''increm=1.0/(dnLeng-1)
-            for j in range( dnLeng ):                
-                dnPOC = cmds.shadingNode ( 'pointOnCurveInfo', asUtility=True, n = 'dnPOC'+ str(j+1).zfill(2))
-                crvShape = cmds.listRelatives( scCrv, c=1, s=1, ni =1 )[0] 
-                cmds.connectAttr ( crvShape + ".worldSpace",  dnPOC + '.inputCurve')
-                cmds.setAttr ( dnPOC + '.turnOnPercentage', 1 )
-                cmds.setAttr ( dnPOC + '.parameter', increm *index )        	
-                xyz = cmds.getAttr(dnPOC+".position" )
-                cmds.setAttr( dnCvs[dnLeng-index-1]+".xValue", -xyz[0][0] )
-                cmds.setAttr( dnCvs[dnLeng-index-1]+".yValue", xyz[0][1] )
-                cmds.setAttr( dnCvs[dnLeng-index-1]+".zValue", xyz[0][2] )'''
-                
+
     elif scDirection*dnDirection < 0:            
   
         if scLeng == dnLeng:
@@ -1944,34 +1932,7 @@ def mirrorCurveShape( ):
         
         else:
             cmds.confirmDialog( title='Confirm', message='select curves with same number of cvs' )
-'''                
-    else: 
-        print "sitting on X X or -X -X"
-        if scDirection*dnDirection > 0: 
-            if scLeng == dnLeng:
-                for index in range( scLeng ):
-                    scPos = cmds.xform(scCvs[index], q=1, os=1, t=1 )
-                    scEndPos = cmds.xform(scCvs[dnLeng-index-1], q=1, os=1, t=1 )
-                    #scXPos = cmds.xform(scCvs[dnLeng-index-1], q=1, os=1, t=1 )
-                    cmds.setAttr( dnCvs[dnLeng-index-1]+".xValue", scEndPos[0] )
-                    cmds.setAttr( dnCvs[dnLeng-index-1]+".yValue", scPos[1] )
-                    cmds.setAttr( dnCvs[dnLeng-index-1]+".zValue", scPos[2] )
-            
-            else:
-                cmds.confirmDialog( title='Confirm', message='select curves with same number of cvs' )
-                    
-        elif scDirection*dnDirection < 0:            
-                    
-            if scLeng == dnLeng:
-                for index in range( scLeng ):
-                    scPos = cmds.xform(scCvs[index], q=1, os=1, t=1 )
-                    scEndPos = cmds.xform(scCvs[dnLeng-index-1], q=1, os=1, t=1 )
-                    cmds.setAttr( dnCvs[index]+".xValue", scEndPos[0] )
-                    cmds.setAttr( dnCvs[index]+".yValue", scPos[1] )
-                    cmds.setAttr( dnCvs[index]+".zValue", scPos[2] )
-            
-            else:
-                cmds.confirmDialog( title='Confirm', message='select curves with same number of cvs' )'''
+
                 
                 
 def mirror_eyeLidShape( ABCD ):
@@ -2345,11 +2306,12 @@ def browWeightCalculate():
 #create "L_EyeDecompose" to attach to body
 def createEyeRig():
     
-    if cmds.objExists("eyeRigP")==False:
+    if not cmds.objExists("eyeRigP"):
         eyeRigP = cmds.group( em=True, n = "eyeRigP", p= "eyeRig" )      
 
-    if cmds.objExists('eyeTR')==False:
+    if not cmds.objExists('eyeTR'):
         eyeRigTR = cmds.group( em=True, n = 'eyeTR', p= 'eyeRigP' )
+
     else:
         eyeRigTR = "eyeTR"
         if not "eyeRigP" in cmds.listRelatives( eyeRigTR, p = 1 ):
@@ -2399,7 +2361,7 @@ def createEyeRig():
             cmds.connectAttr( DMat + ".outputScale", decomNull + ".s" )   
             cmds.connectAttr( DMat + ".outputShear", decomNull + ".shear" ) 
             
-            ctl = LR+"eye_ctl"
+            ctl = LR+"eyeDir_ctl"
             if cmds.objExists( ctl ):
                 mult = cmds.shadingNode("multiplyDivide", asUtility=1, n = LR + "eyeBall_mult")
                 cmds.connectAttr( ctl + ".tx", mult + ".input1X")
@@ -2509,9 +2471,12 @@ def lidPush_blink_squint():
         BCDtypeCtrlSetup.CCtrlSetup( LR + "eyeSquint", LR, ["y","x"], [LR + "upSquint_crv", LR + "loSquint_crv"], [LR + "upAnnoyed_crv", LR + "loAnnoyed_crv"] )
         
         #blink ctl connection to blendshape
-        BCDtypeCtrlSetup.BCtrlSetup(  LR[0].title() + "eye_open", "y", LR +"upWide_crv", LR + "upBlinkCrv01" )  
-        BCDtypeCtrlSetup.BCtrlSetup(  LR[0].title() + "eye_open", "y", LR +"loWide_crv", LR + "loBlinkCrv01" )       
-        
+        BCDtypeCtrlSetup.CCtrlSetup(LR + "eyeSquint_ctl", LR, ["y", "x"],
+                                    [LR + "upShape_Squint", LR + "loShape_Squint", LR + "upWide_Squint",
+                                     LR + "loWide_Squint"],
+                                    [LR + "upShape_Annoyed", LR + "loShape_Annoyed", LR + "upWide_Annoyed",
+                                     LR + "loWide_Annoyed"])
+
         #eyePush ctl connection to blendshape
         #DCtrlSetup( "l_eye_ctl", "l_lidPush", "lid")
         eyeDCtrlSetup( LR + "eyeballRot", LR+"lidPush", "lid")
@@ -2559,7 +2524,7 @@ def eyeDCtrlSetup( ctl, name, factor ):
     attrs = ['X_pos','Y_pos', 'X_neg', 'Y_neg','XPos_YPos', 'XPos_YNeg', 'XNeg_YNeg', 'XNeg_YPos']
     cmds.select( factor+"Factor")
     for att in attrs:
-        if cmds.attributeQuery( name+att, node= factor+"Factor", exists=True)==False:
+        if not cmds.attributeQuery( name+att, node= factor+"Factor", exists=True):
             cmds.addAttr( longName= name+att, attributeType='double' )
     
     posClamp = cmds.shadingNode( 'clamp', asUtility = 1, n =name + 'xyPos_clamp' )

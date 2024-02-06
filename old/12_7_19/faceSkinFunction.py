@@ -97,7 +97,7 @@ def genericController( ctlName, position, radius, shape, colorId ):
 
             
 def faceClusters():
-    headGeo = cmds.getAttr("helpPanel_grp.headGeo")  
+    headGeo = cmds.getAttr("helpPanel_grp.headGeo")
     #xmin ymin zmin xmax ymax zmax (face bounding box)
     facebbox = cmds.xform( headGeo, q=1, boundingBox =1 )
     rad = facebbox[3]/20.0
@@ -270,7 +270,7 @@ def tranToRot_mult( ctlJnt, ratio ):
 #create joint for cluster and ctrl
 #place ctlP for easy grab ( "faceLoc_grp"|"faceClsFrame" or "attachCtl_grp"|"midCtl_grp" )
 def clusterOnJoint( loc, clsName, ctlP, offset, rad, sect ):         
-    headGeo = cmds.getAttr("helpPanel_grp.headGeo") 
+    headGeo = cmds.getAttr("helpPanel_grp.headGeo")
     clsPos = cmds.xform ( loc, q= 1, ws =1 , t=1 )
     ctl = cmds.circle( d =1, n = clsName.replace( 'cls', 'onCtl') )
     null = cmds.duplicate( ctl[0], po=1, n = clsName.replace( 'cls', 'ctlP') )
@@ -303,7 +303,7 @@ def clusterOnJoint( loc, clsName, ctlP, offset, rad, sect ):
 #place ctlP for easy grab ( "faceLoc_grp| "faceClsFrame" or "attachCtl_grp"|"midCtl_grp" )
 def clusterForSkinWeight( loc, zDepth, clsName, ctlP, rad, sect, colorID ):       
     
-    headGeo = cmds.getAttr("helpPanel_grp.headGeo") 
+    headGeo = cmds.getAttr("helpPanel_grp.headGeo")
     clsPos = cmds.xform ( loc, q= 1, ws =1 , t=1 )
     clsRot = cmds.xform ( loc, q= 1, ws =1 , ro=1 )
     position = (clsPos[0], clsPos[1], zDepth )
@@ -1600,7 +1600,7 @@ def copyClusterWgt(sdCls, ddCls):
 def exportClsWgt():
     #pathProject = cmds.workspace(  q=True, rd = True )
     dataPath = cmds.fileDialog2(fileMode=3, caption="set directory")
-    #cmds.file( filename[0], i=True );
+    #cmds.file( filename[0], index=True );
     if "clusterWeight" not in dataPath[0]:
         i = 0
         while os.path.isdir(dataPath[0] + "/clusterWeight%s" % i):   
@@ -1890,7 +1890,7 @@ def indieClsWeightMirror( clsName ):
 #set keys on all ctrls
 def dgTimer():
     dataPath = cmds.fileDialog2(fileMode=3, caption="set directory")
-    #cmds.file( filename[0], i=True );
+    #cmds.file( filename[0], index=True );
     i = 0
     while os.path.isdir(dataPath[0] + "/dgTimer%s"%i):   
         i += 1

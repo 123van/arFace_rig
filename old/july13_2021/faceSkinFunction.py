@@ -103,7 +103,7 @@ def genericController( ctlName, position, radius, shape, colorId ):
 
             
 def faceClusters():
-    headGeo = cmds.getAttr("helpPanel_grp.headGeo")  
+    headGeo = cmds.getAttr("helpPanel_grp.headGeo")
     #xmin ymin zmin xmax ymax zmax (face bounding box)
     facebbox = cmds.xform( headGeo, q=1, boundingBox =1 )
     rad = facebbox[3]/20.0
@@ -329,7 +329,7 @@ def tranToRot_mult( ctlJnt, ratio ):
 #create joint for cluster and ctrl
 #place ctlP for easy grab ( "faceLoc_grp"|"faceClsFrame" or "attachCtl_grp"|"midCtl_grp" )
 def clusterOnJoint( loc, clsName, ctlP, offset, rad, sect ):         
-    headGeo = cmds.getAttr("helpPanel_grp.headGeo") 
+    headGeo = cmds.getAttr("helpPanel_grp.headGeo")
     clsPos = cmds.xform ( loc, q= 1, ws =1 , t=1 )
     ctl = cmds.circle( d =1, n = clsName.replace( 'cls', 'onCtl') )
     null = cmds.duplicate( ctl[0], po=1, n = clsName.replace( 'cls', 'ctlP') )
@@ -362,7 +362,7 @@ def clusterOnJoint( loc, clsName, ctlP, offset, rad, sect ):
 #place ctlP for easy grab ( "faceLoc_grp| "faceClsFrame" or "attachCtl_grp"|"midCtl_grp" )
 def clusterForSkinWeight( loc, zDepth, clsName, ctlP, rad, sect, colorID ):       
     
-    headGeo = cmds.getAttr("helpPanel_grp.headGeo") 
+    headGeo = cmds.getAttr("helpPanel_grp.headGeo")
     clsPos = cmds.xform ( loc, q= 1, ws =1 , t=1 )
     clsRot = cmds.xform ( loc, q= 1, ws =1 , ro=1 )
     position = (clsPos[0], clsPos[1], zDepth )
@@ -1429,7 +1429,7 @@ def copyClusterWgt(sdCls, ddCls):
 def exportClsWgt():
     #pathProject = cmds.workspace(  q=True, rd = True )
     dataPath = cmds.fileDialog2(fileMode=3, caption="set directory")
-    #cmds.file( filename[0], i=True );
+    #cmds.file( filename[0], index=True );
     if "clusterWeight" not in dataPath[0]:
         i = 0
         while os.path.isdir(dataPath[0] + "/clusterWeight%s" % i):   
@@ -1520,19 +1520,19 @@ def copyCurveShapes():
     scCv = cmds.ls(crvSel[0]+".cv[*]", l=1, fl=1 )
     dnCv = cmds.ls(crvSel[1]+".cv[*]", l=1, fl=1 )
     if len(scCv) == len( dnCv ):
-        for i in range(len(dnCv)):
-            scPos = cmds.xform(scCv[i], q=1, ws=1, t=1 )
-            cmds.setAttr( dnCv[i]+".xValue", scPos[0])
-            cmds.setAttr( dnCv[i]+".yValue", scPos[1])
-            cmds.setAttr( dnCv[i]+".zValue", scPos[2])   
+        for index in range(len(dnCv)):
+            scPos = cmds.xform(scCv[index], q=1, ws=1, t=1 )
+            cmds.setAttr( dnCv[index]+".xValue", scPos[0])
+            cmds.setAttr( dnCv[index]+".yValue", scPos[1])
+            cmds.setAttr( dnCv[index]+".zValue", scPos[2])   
     
     else:
         increm=1.0/(len(dnCv)-1)
-        for i, dnVtx in enumerate( dnCv ):
-            dnPOC = cmds.shadingNode ( 'pointOnCurveInfo', asUtility=True, n = 'dnPOC'+ str(i+1).zfill(2))
+        for index, dnVtx in enumerate( dnCv ):
+            dnPOC = cmds.shadingNode ( 'pointOnCurveInfo', asUtility=True, n = 'dnPOC'+ str(index+1).zfill(2))
             cmds.connectAttr ( crvSel[0] + ".worldSpace",  dnPOC + '.inputCurve')
     	    cmds.setAttr ( dnPOC + '.turnOnPercentage', 1 )
-    	    cmds.setAttr ( dnPOC + '.parameter', increm *i )	    
+    	    cmds.setAttr ( dnPOC + '.parameter', increm *index )	    
     	
             xyz = cmds.getAttr(dnPOC+".position" )
             cmds.setAttr( dnVtx+".xValue", xyz[0][0] )
@@ -1598,19 +1598,19 @@ def mirrorCurveShape():
             
     leng = len(mrrCv)
     if leng == len(dnCvs):
-        for i in range(leng ):
-            scPos = cmds.xform(mrrCv[i], q=1, ws=1, t=1 )
-            cmds.setAttr( dnCvs[i]+".xValue", scPos[0] )
-            cmds.setAttr( dnCvs[i]+".yValue", scPos[1] )
-            cmds.setAttr( dnCvs[i]+".zValue", scPos[2] )
+        for index in range(leng ):
+            scPos = cmds.xform(mrrCv[index], q=1, ws=1, t=1 )
+            cmds.setAttr( dnCvs[index]+".xValue", scPos[0] )
+            cmds.setAttr( dnCvs[index]+".yValue", scPos[1] )
+            cmds.setAttr( dnCvs[index]+".zValue", scPos[2] )
     
     else:
         increm=1.0/(len(dnCvs)-1)
-        for i, dnVtx in enumerate( dnCvs ):
-            dnPOC = cmds.shadingNode ( 'pointOnCurveInfo', asUtility=True, n = 'dnPOC'+ str(i+1).zfill(2))
+        for index, dnVtx in enumerate( dnCvs ):
+            dnPOC = cmds.shadingNode ( 'pointOnCurveInfo', asUtility=True, n = 'dnPOC'+ str(index+1).zfill(2))
             cmds.connectAttr ( mrrCv + ".worldSpace",  dnPOC + '.inputCurve')
     	    cmds.setAttr ( dnPOC + '.turnOnPercentage', 1 )
-    	    cmds.setAttr ( dnPOC + '.parameter', increm *i )	    
+    	    cmds.setAttr ( dnPOC + '.parameter', increm *index )	    
     	
             xyz = cmds.getAttr(dnPOC+".position" )
             cmds.setAttr( dnVtx+".xValue", xyz[0][0] )
@@ -1661,11 +1661,11 @@ def mirrorCurveShape( ):
                 crvShape = cmds.listRelatives( scCrv, c=1, s=1, ni =1 )[0] 
                 cmds.connectAttr ( crvShape + ".worldSpace",  dnPOC + '.inputCurve')
                 cmds.setAttr ( dnPOC + '.turnOnPercentage', 1 )
-                cmds.setAttr ( dnPOC + '.parameter', increm *i )        	
+                cmds.setAttr ( dnPOC + '.parameter', increm *index )        	
                 xyz = cmds.getAttr(dnPOC+".position" )
-                cmds.setAttr( dnCvs[dnLeng-i-1]+".xValue", -xyz[0][0] )
-                cmds.setAttr( dnCvs[dnLeng-i-1]+".yValue", xyz[0][1] )
-                cmds.setAttr( dnCvs[dnLeng-i-1]+".zValue", xyz[0][2] )'''	
+                cmds.setAttr( dnCvs[dnLeng-index-1]+".xValue", -xyz[0][0] )
+                cmds.setAttr( dnCvs[dnLeng-index-1]+".yValue", xyz[0][1] )
+                cmds.setAttr( dnCvs[dnLeng-index-1]+".zValue", xyz[0][2] )'''
                 
     elif scDirection*dnDirection < 0:            
   
@@ -1684,13 +1684,13 @@ def mirrorCurveShape( ):
         print "sitting on X X or -X -X"
         if scDirection*dnDirection > 0: 
             if scLeng == dnLeng:
-                for i in range( scLeng ):
-                    scPos = cmds.xform(scCvs[i], q=1, os=1, t=1 )
-                    scEndPos = cmds.xform(scCvs[dnLeng-i-1], q=1, os=1, t=1 )
-                    #scXPos = cmds.xform(scCvs[dnLeng-i-1], q=1, os=1, t=1 )
-                    cmds.setAttr( dnCvs[dnLeng-i-1]+".xValue", scEndPos[0] )
-                    cmds.setAttr( dnCvs[dnLeng-i-1]+".yValue", scPos[1] )
-                    cmds.setAttr( dnCvs[dnLeng-i-1]+".zValue", scPos[2] )
+                for index in range( scLeng ):
+                    scPos = cmds.xform(scCvs[index], q=1, os=1, t=1 )
+                    scEndPos = cmds.xform(scCvs[dnLeng-index-1], q=1, os=1, t=1 )
+                    #scXPos = cmds.xform(scCvs[dnLeng-index-1], q=1, os=1, t=1 )
+                    cmds.setAttr( dnCvs[dnLeng-index-1]+".xValue", scEndPos[0] )
+                    cmds.setAttr( dnCvs[dnLeng-index-1]+".yValue", scPos[1] )
+                    cmds.setAttr( dnCvs[dnLeng-index-1]+".zValue", scPos[2] )
             
             else:
                 cmds.confirmDialog( title='Confirm', message='select curves with same number of cvs' )
@@ -1698,12 +1698,12 @@ def mirrorCurveShape( ):
         elif scDirection*dnDirection < 0:            
                     
             if scLeng == dnLeng:
-                for i in range( scLeng ):
-                    scPos = cmds.xform(scCvs[i], q=1, os=1, t=1 )
-                    scEndPos = cmds.xform(scCvs[dnLeng-i-1], q=1, os=1, t=1 )
-                    cmds.setAttr( dnCvs[i]+".xValue", scEndPos[0] )
-                    cmds.setAttr( dnCvs[i]+".yValue", scPos[1] )
-                    cmds.setAttr( dnCvs[i]+".zValue", scPos[2] )
+                for index in range( scLeng ):
+                    scPos = cmds.xform(scCvs[index], q=1, os=1, t=1 )
+                    scEndPos = cmds.xform(scCvs[dnLeng-index-1], q=1, os=1, t=1 )
+                    cmds.setAttr( dnCvs[index]+".xValue", scEndPos[0] )
+                    cmds.setAttr( dnCvs[index]+".yValue", scPos[1] )
+                    cmds.setAttr( dnCvs[index]+".zValue", scPos[2] )
             
             else:
                 cmds.confirmDialog( title='Confirm', message='select curves with same number of cvs' )'''
@@ -1898,7 +1898,7 @@ def indieClsWeightMirror( clsName ):
 #set keys on all ctrls
 def dgTimer():
     dataPath = cmds.fileDialog2(fileMode=3, caption="set directory")
-    #cmds.file( filename[0], i=True );
+    #cmds.file( filename[0], index=True );
     i = 0
     while os.path.isdir(dataPath[0] + "/dgTimer%s"%i):   
         i += 1

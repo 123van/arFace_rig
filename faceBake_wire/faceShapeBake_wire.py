@@ -3326,7 +3326,7 @@ def lipSmoothWeight( crv , headGeo ):
 
         
     else:
-        cmds.confirmDialog( title='Confirm', message='more than 1 lipCrv or headGeo!! ' )            
+        cmds.confirmDialog( title='Confirm', message='more than 1 lipCrv or headGeo!! ' )
 
         
 

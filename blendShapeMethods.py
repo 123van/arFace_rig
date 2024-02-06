@@ -623,7 +623,7 @@ def twitchUpdateWeight( splitRange ):
         
           
     else:
-        cmds.confirmDialog( title='Confirm', message= "no %s in headGeo's history"%twichBS )        
+        cmds.confirmDialog( title='Confirm', message= "no %s in headGeo's history"%twichBS )
 
 
 
@@ -743,7 +743,7 @@ def resetForCorrectiveFix():
             cmds.setAttr('twitchBS.it[0].itg[%s].iti[6000].inputComponentsTarget'%(targetID+2), len(comp), *comp, type="componentList" )
             cmds.setAttr('twitchBS.it[0].itg[%s].iti[6000].inputPointsTarget'%(targetID+2), len(delta), *newDelta, type="pointArray" )
             '''
-            targetReset = copyOrigMesh( baseGeo, "default" )
+            targetReset = copyOrigMesh( headGeo, "default" )
             cmds.connectAttr( targetReset +".worldMesh[0]", "twitchBS.inputTarget[0].inputTargetGroup[%s].inputTargetItem[6000].inputGeomTarget"%targetID )
             cmds.connectAttr( targetReset +".worldMesh[0]", "twitchBS.inputTarget[0].inputTargetGroup[%s].inputTargetItem[6000].inputGeomTarget"%(targetID+1) )
             cmds.connectAttr( targetReset +".worldMesh[0]", "twitchBS.inputTarget[0].inputTargetGroup[%s].inputTargetItem[6000].inputGeomTarget"%(targetID+2) )
@@ -791,7 +791,7 @@ def extraCrvShape_corrective( mySel, xyz, plusName, minusName, splitRange ):
         minusList += minusTargets
     
     # II. addTarget to twitchBS for corrective
-    baseGeo =cmds.getAttr("helpPanel_grp.headGeo") 
+    baseGeo =cmds.getAttr("helpPanel_grp.headGeo")
     plusTarget = cmds.duplicate( baseGeo, rc =1, n = plusName )[0] #just for the script, not be used
     cmds.select( plusTarget , r =1 )
     plusLRtarget = addTarget( splitRange, "corrective" ) #create empty twitchBS.3targets for correctives        
@@ -839,21 +839,21 @@ def simpleCtl_bsConnect( mySel, xyz, plusName, minusName, splitRange):
             bsAttr = cmds.aliasAttr(bs, q=1)
             for tgt, wgt in zip(*[iter(bsAttr)]*2):
                 if name in tgt:
-                    plusList.append(tgt) 
+                    plusList.append(tgt)
+
     for name in minusNames:
         for bs in bsList:
             bsAttr = cmds.aliasAttr(bs, q=1)
             for tgt, wgt in zip(*[iter(bsAttr)]*2):
                 if name in tgt:
                     minusList.append(tgt)
-    print plusList[0] 
     
     for LR in ["l_", "r_"]:
 
-        ctl = [ c for c in myCtls if LR in c ]
+        ctl = [ c for c in myCtls if c.startswith(LR) ]
         if ctl:
             targetPlus = [ x for x in plusList if LR in x ]
-            print ctl, targetPlus
+
             targetMinus = [ y for y in minusList if LR in y ]
             ctrlPlusMinus_connect(  ctl[0], xyz, targetPlus, targetMinus )  
         
@@ -1917,7 +1917,7 @@ def bakeCrvDeltaBS( sourceCrv, targetCrv, name):
         print multList[0], multList[1], multList[2]
         comp = [0]
         for i in range( numTgt ):
-            # length of comp is different for each target because the vertexs that has none movement don't counts
+            # browLength of comp is different for each target because the vertexs that has none movement don't counts
             comp = cmds.getAttr(crvBS[0]+ '.inputTarget[0].inputTargetGroup[%s].inputTargetItem[6000].inputComponentsTarget'%str(i) )
             delta = cmds.getAttr(crvBS[0]+ '.inputTarget[0].inputTargetGroup[%s].inputTargetItem[6000].inputPointsTarget'%str(i) )
             newDelta = []
@@ -1930,7 +1930,7 @@ def bakeCrvDeltaBS( sourceCrv, targetCrv, name):
                 cmds.setAttr(newBS[0]+'.inputTarget[0].inputTargetGroup[%s].inputTargetItem[6000].inputComponentsTarget'%str(i), len(comp), *comp, type="componentList" )
                 cmds.setAttr(newBS[0]+'.inputTarget[0].inputTargetGroup[%s].inputTargetItem[6000].inputPointsTarget'%str(i), len(newDelta), *newDelta, type="pointArray" )
             else:
-                cmds.confirmDialog( title='Confirm', message='dnTarget[i] + " delta has none ' )
+                cmds.confirmDialog( title='Confirm', message='dnTarget[index] + " delta has none ' )
 
     else:
         cmds.confirmDialog( title='Confirm', message='create blendShape first' )

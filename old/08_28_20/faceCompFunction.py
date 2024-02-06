@@ -20,7 +20,7 @@ def headGeo():
     faceGeo = cmds.ls(sl=1, type = "transform")[0]
     if cmds.attributeQuery("headGeo", node = "helpPanel_grp", exists=1)==False:
         cmds.addAttr( "helpPanel_grp", ln ="headGeo", dt = "string"  )
-    cmds.setAttr("helpPanel_grp.headGeo", faceGeo, type= "string"  ) 
+    cmds.setAttr("helpPanel_grp.headGeo", faceGeo, type= "string"  )
 
     
 #store brow vertices in browFactor( selection order: center to left !! )
@@ -198,7 +198,7 @@ def shapeToCurve():
         uParam = getUParam ( pos, targetCrv )
         print uParam        
         dnPOC = cmds.shadingNode ( 'pointOnCurveInfo', asUtility=True, n = 'dnPOC'+ str(i+1).zfill(2))
-        #loc = cmds.spaceLocator ( n = "targetPoc"+ str(i+1).zfill(2))
+        #loc = cmds.spaceLocator ( n = "targetPoc"+ str(index+1).zfill(2))
         cmds.connectAttr (targetCrvShape[0] + ".worldSpace",  dnPOC + '.inputCurve')
         #cmds.setAttr ( dnPOC + '.turnOnPercentage', 1 )
         cmds.setAttr ( dnPOC + '.parameter', uParam )        
@@ -257,7 +257,7 @@ def edgeSelection( eyeLip ):
     if eyeLip == 'eye':
         lidJnt = cmds.ls('l_*LidBlink*_jnt', fl=1, type = 'transform')
         numOfJnt = len(lidJnt)
-        print "eyeVerts length is " + str(numOfJnt) 
+        print "eyeVerts browLength is " + str(numOfJnt)
         
     elif eyeLip =='lip':
         lipJnt = cmds.ls('*LipRollP*', fl=1, type = 'transform')
@@ -474,15 +474,15 @@ def symmetrizeLipCrv(direction):
         
     if direction == 1:
         print "left cv to right cv"
-        for i, cv in enumerate(leftCv[1:]):
+        for index, cv in enumerate(leftCv[1:]):
             pos = cmds.xform( cv, q=1, ws=1, t=1 )
-            cmds.xform( rightCv[i], ws=1, t=( -pos[0], pos[1], pos[2] ) )
+            cmds.xform( rightCv[index], ws=1, t=( -pos[0], pos[1], pos[2] ) )
         
     else:
         print "right cv to left cv"
-        for i, cv in enumerate(rightCv[:-1]):
+        for index, cv in enumerate(rightCv[:-1]):
             pos = cmds.xform( cv, q=1, ws=1, t=1 )
-            cmds.xform( leftCv[i], ws=1, t=( -pos[0], pos[1], pos[2] ) )'''
+            cmds.xform( leftCv[index], ws=1, t=( -pos[0], pos[1], pos[2] ) )'''
 
 
  
@@ -850,9 +850,9 @@ def connectBrowCtrls ( numOfCtl, size, offset, crv, browCtl ):
     strs = string.ascii_uppercase
     lf=[]
     rt=[]
-    for i in range(1, centerNum):
-        rName= "R"+ strs[centerNum-i]
-        lName= "L"+ strs[i]
+    for index in range(1, centerNum):
+        rName= "R"+ strs[centerNum-index]
+        lName= "L"+ strs[index]
         rt.append(rName)
         lf.append(lName)    
     sequence = rt+["A"]+lf
@@ -906,7 +906,7 @@ def connectBrowCtrls ( numOfCtl, size, offset, crv, browCtl ):
                    
     increment = 1.0/(jntNum-1)
     index = 0 
-    for i, jnt in enumerate(orderJnts):
+    for index, jnt in enumerate(orderJnts):
         basePos = cmds.xform( jnt, t = True, q = True, ws = True)
         print jnt
         browJntList = cmds.listRelatives ( jnt, c=True, ad =1 )
@@ -946,7 +946,7 @@ def connectBrowCtrls ( numOfCtl, size, offset, crv, browCtl ):
             for att in attrs:            
                 cmds.setAttr ( rBrowCtrl[0] + ".%s"%att, lock =1, keyable = 0)
             
-            cmds.connectAttr(dtailPoc[i]+".position", zeroGrp[0] + ".t" )                        
+            cmds.connectAttr(dtailPoc[index]+".position", zeroGrp[0] + ".t" )                        
             browCrvCtlToJnt( rBrowCtrl[0], jnt, browJntList,  shapePOC, POC, index )
         
         elif jnt in y : #left joints
@@ -963,7 +963,7 @@ def connectBrowCtrls ( numOfCtl, size, offset, crv, browCtl ):
             for att in attrs:            
                 cmds.setAttr ( lBrowCtrl[0] + ".%s"%att, lock =1, keyable = 0)
             
-            cmds.connectAttr(dtailPoc[i]+".position", zeroGrp[0] + ".t" )
+            cmds.connectAttr(dtailPoc[index]+".position", zeroGrp[0] + ".t" )
             browCrvCtlToJnt (lBrowCtrl[0], jnt, browJntList,  shapePOC, POC, index  )
             
         elif jnt == z[0]:
@@ -980,7 +980,7 @@ def connectBrowCtrls ( numOfCtl, size, offset, crv, browCtl ):
             for att in attrs:            
                 cmds.setAttr ( centerBrowCtrl[0] + ".%s"%att, lock =1, keyable = 0 )
             
-            cmds.connectAttr(dtailPoc[i]+".position", zeroGrp[0] + ".t" )    
+            cmds.connectAttr(dtailPoc[index]+".position", zeroGrp[0] + ".t" )    
             browCrvCtlToJnt ( centerBrowCtrl[0], jnt, browJntList, shapePOC, POC, index )
             
         index = index + 1'''
@@ -1274,7 +1274,7 @@ def browCtl_onHead( numOfCtl, offset, radius, polyEdgeCrv, myCtl ):
     if polyEdgeCrv:
         crv = polyEdgeCrv
     else:    
-        headMesh = cmds.getAttr("helpPanel_grp.headGeo") 
+        headMesh = cmds.getAttr("helpPanel_grp.headGeo")
         browVerts = cmds.getAttr( "browFactor.browVerts" )
         cpmNode = cmds.createNode("closestPointOnMesh", n = "closestPointM_node")
         cmds.connectAttr( headMesh + ".outMesh", cpmNode + ".inMesh")
@@ -1363,7 +1363,7 @@ def browCtl_onHead( numOfCtl, offset, radius, polyEdgeCrv, myCtl ):
                 cmds.parent( null, browCtlGrp )
                 
             else:
-                #sequence = [i], color = (i+1)*2, pos = pocs[center-i], pocs[center+ i]
+                #sequence = [index], color = (index+1)*2, pos = pocs[center-index], pocs[center+ index]
                 LR = { "L":center+i, "R": center-i }
                 n = 0
                 for k, x in LR.items():
@@ -1727,7 +1727,7 @@ def eyeHiCrv( prefix ):
 
 #create "attachCtl_grp" in hierachy
 # adjust CTLcrv(master) shape to hiCrv
-# place joints for eyeCtls at 20*i% on hi curve
+# place joints for eyeCtls at 20*index% on hi curve
 def eyeCtrls( prefix, numEyeCtl, offset ):
    
     headMesh = cmds.getAttr( "helpPanel_grp.headGeo")
@@ -1829,7 +1829,7 @@ def eyeCtrls( prefix, numEyeCtl, offset ):
         cmds.setAttr( ctl[1] + ".tz", offset )
         cmds.parent( ctlGrp , "eyeOnCtl_grp" )
                     
-        #print "%s is for %s"%(str(i), ctl)
+        #print "%s is for %s"%(str(index), ctl)
         
         cmds.connectAttr( ctl[0] + ".t" , jnt + ".t" )
         cmds.connectAttr( ctl[0] + ".r" , jnt + ".r" )
@@ -2049,7 +2049,7 @@ def mouthJoint( upLow, numCtls ):
     elif upLow == "lo":
     	lipCntPos = lipSPos
 		#jmax = 1
-		#jmax = vNum+1 :: it wont work because the curve length should be from 0 to 1
+		#jmax = vNum+1 :: it wont work because the curve browLength should be from 0 to 1
 		
     #create blendShape curves for lip ( jawOpen/ happy / sad....)
     tempCrv = cmds.curve(d= 3, ep= [lipWPos, lipCntPos,lipEPos] ) 
@@ -2314,11 +2314,11 @@ def mouthCrvToJoint( upLow ):
 		'''cmds.setAttr ( lipRollTran_plus + '.operation', 1 ) 
 		cmds.connectAttr ( lipPuffPoc + '.positionX', lipRollTran_plus + '.input3D[0].input3Dx') 
 		cmds.setAttr (lipRollTran_plus + '.input3D[1].input3Dx', -iniX )
-		cmds.connectAttr ( lipRollTran_plus + '.output3Dx',  rollJnts[i] + '.tx')
+		cmds.connectAttr ( lipRollTran_plus + '.output3Dx',  rollJnts[index] + '.tx')
 
 		cmds.setAttr ( jotXTran_plus + '.operation', 1 ) 
 		cmds.connectAttr ( lipPuffPoc + '.positionY', lipRollTran_plus + '.input3D[0].input3Dy') 
-		cmds.connectAttr ( lipRollTran_plus + '.output3Dy',  rollJnts[i] + '.ty')'''
+		cmds.connectAttr ( lipRollTran_plus + '.output3Dy',  rollJnts[index] + '.ty')'''
 
 		cmds.setAttr ( jotXTran_plus + '.operation', 1 ) 
 		cmds.connectAttr ( lipPuffPoc + '.positionZ', lipRollTran_plus + '.input1D[0]' )
@@ -2934,7 +2934,7 @@ def lipFreeCtl( upLow, numCtls, offset, myCtl ):
     	cmds.connectAttr( ctl[0] + ".tz", plus + ".input1D[1]" )
     	cmds.connectAttr( ctl[0] + ".r", rollJnt[i] + ".r" )
     	cmds.connectAttr( ctl[0] + ".s", rollJnt[i] + ".s" )    	
-    	#cmds.connectAttr( pocList[i] + ".position", grp + ".t" )Tue Nov 26 18:20:07 2019         
+    	#cmds.connectAttr( pocList[index] + ".position", grp + ".t" )Tue Nov 26 18:20:07 2019
     	cmds.parent( prnt, "lip_dtailCtl_grp" ) 
     	
 
@@ -3265,19 +3265,19 @@ def mouthCtlToCrv():
 		rollJnts.append(x)
 		ryJnts.append(y) 
 
-	for i in range(jntNum):        
+	for index in range(jntNum):        
 		if cmds.objExists("swivel_ctrl"):
 		
-			jotXRotZ_add  = cmds.shadingNode ( 'addDoubleLinear', asUtility=True, n = upLow + 'JotX' + str(i) +'_add' )
-			cmds.connectAttr ( 'swivel_ctrl.tx', jotXMults[i] + '.input1Y' )
-			cmds.connectAttr ( "lipFactor.lipJotX_ry", jotXMults[i] + '.input2Y' )        	
-			cmds.connectAttr ( jotXMults[i]+ '.outputY', lipJots[i] +'.ry')
+			jotXRotZ_add  = cmds.shadingNode ( 'addDoubleLinear', asUtility=True, n = upLow + 'JotX' + str(index) +'_add' )
+			cmds.connectAttr ( 'swivel_ctrl.tx', jotXMults[index] + '.input1Y' )
+			cmds.connectAttr ( "lipFactor.lipJotX_ry", jotXMults[index] + '.input2Y' )        	
+			cmds.connectAttr ( jotXMults[index]+ '.outputY', lipJots[index] +'.ry')
 		
-			cmds.connectAttr ( 'swivel_ctrl.tx', jotXMults[i] + '.input1Z' )
-			cmds.connectAttr ( "lipFactor.lipJotX_rz", jotXMults[i] + '.input2Z' )
-			cmds.connectAttr ( jotXMults[i] + '.outputZ', jotXRotZ_add + ".input1" )        	
+			cmds.connectAttr ( 'swivel_ctrl.tx', jotXMults[index] + '.input1Z' )
+			cmds.connectAttr ( "lipFactor.lipJotX_rz", jotXMults[index] + '.input2Z' )
+			cmds.connectAttr ( jotXMults[index] + '.outputZ', jotXRotZ_add + ".input1" )        	
 			cmds.connectAttr ( 'swivel_ctrl.rz', jotXRotZ_add + ".input2" )
-			cmds.connectAttr ( jotXRotZ_add + ".output", lipJots[i] +'.rz' )
+			cmds.connectAttr ( jotXRotZ_add + ".output", lipJots[index] +'.rz' )
 			
 	cmds.connectAttr ( 'swivel_ctrl.tx', 'jawSemi.tx' )
 	cmds.connectAttr ( 'swivel_ctrl.ty', 'jawSemi.ty' )
@@ -3372,7 +3372,7 @@ def mouthCtlToCrv():
 
 
 def extraCrvToJoint():
-        #tyPoc =cmds.shadingNode ( 'pointOnCurveInfo', asUtility=True, n = upLow +'LipTy' + str(i).zfill(2) + '_poc' )
+        #tyPoc =cmds.shadingNode ( 'pointOnCurveInfo', asUtility=True, n = upLow +'LipTy' + str(index).zfill(2) + '_poc' )
         TYpoc = upLow +'_jawDrop' + str(i).zfill(2) + '_poc'
         initJawDropX = cmds.getAttr ( TYpoc + '.positionX' )
         initJawDropY = cmds.getAttr ( TYpoc + '.positionY' )
@@ -3848,8 +3848,8 @@ def mapCurve( vtx, name, openClose, degree ):
         '''closedOrderPos = orderPos + orderPos[:3]
         numPoint = len(closedOrderPos)
         knots = []
-        for i in range(numPoint+2):
-            knots.append(i)
+        for index in range(numPoint+2):
+            knots.append(index)
 
         closeCrv = cmds.curve( d=float(degree), per=1, p=closedOrderPos, k = knots )    
         cmds.rename( closeCrv,  name + "MapCrv01" )'''        
@@ -4085,7 +4085,7 @@ def eyeMapSkinning():
     	else:
     		
     		crvLen = faceLen/jntNum + 1
-    		#how many vertices will be weight for each joint = curve length
+    		#how many vertices will be weight for each joint = curve browLength
     		vrtPerJnt = crvLen
     		skin = headSkinObj(surf)
 	        #skinWeight 100% to "headSkel_jnt" 
@@ -4496,7 +4496,7 @@ def updateHierachy_FaceMain():
                         cmds.xform( lidJnts[i], ws=1, t= vPos )
                         cmds.xform( eyeLocs[i], ws=1, t= vPos )                        
                         cmds.parent ( lidJnts[i], blinkJnts[i] )
-                        #cmds.joint ( cmds.listRelatives(blinkJnts[i],p=1)[0], e =True, ch=True, zso =True, oj = 'zyx', sao= 'yup')
+                        #cmds.joint ( cmds.listRelatives(blinkJnts[index],p=1)[0], e =True, ch=True, zso =True, oj = 'zyx', sao= 'yup')
                         cmds.aimConstraint( eyeLocs[i], blinkJnts[i], mo =1, weight=1, aimVector = (0,0,1), upVector = (0,1,0), worldUpType="object", worldUpObject = prefix[:2] + "eyeUp_loc" )                            
             
             else: 
@@ -4589,7 +4589,7 @@ def mirrorVertice( verts ):
 #miscellaneous_____________________________________________________________________________________________________________
 
 
-# select headGeo(or polyToCurve) and ctls( or parent👈) that are on the skin 
+# select headGeo(or polyToCurve) and ctls( or parent👈) that are on the skin
 def stickCtlToFace( obj, ctls ):
 
     objShp = cmds.listRelatives( obj, c=1, ni =1, s=1 )[0]
@@ -4685,7 +4685,7 @@ def create_uniformCurve( mapCrv, name ):
         increm = 1.0/30
         for i in range(31):           
         
-            parameter = crvFn.findParamFromLength(crvFn.length() * increm * i)
+            parameter = crvFn.findParamFromLength(crvFn.browLength() * increm * i)
             point = OpenMaya.MPoint()
             crvFn.getPointAtParam(parameter, point)
             pos = [point.x, point.y, point.z]
@@ -4703,7 +4703,7 @@ def create_uniformCurve( mapCrv, name ):
         increm = 1.0/32
         for i in range(32): 
         
-            parameter = crvFn.findParamFromLength(crvFn.length() * increm * i)
+            parameter = crvFn.findParamFromLength(crvFn.browLength() * increm * i)
             point = OpenMaya.MPoint()
             crvFn.getPointAtParam(parameter, point)
             pos = [point.x, point.y, point.z]

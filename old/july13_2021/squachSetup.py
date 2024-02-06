@@ -158,7 +158,7 @@ def squachSetup( jntLen ):
         #create ik spline Handle
         ikSpline = cmds.ikHandle( sj=stretchJntList[0], ee=stretchJntList[-1], sol = "ikSplineSolver", createCurve=1, n ="squach_ik", rootOnCurve=True, parentCurve=False, numSpans = 2 )
         cmds.skinCluster( topJnt[0], bttmJnt[0],  ikSpline[-1], n="squach_skin" )
-        #connect curveInfo node to get curve length 
+        #connect curveInfo node to get curve browLength
         crvLen = cmds.shadingNode( "curveInfo", asUtility=1, n = "stretch_crvInfo" )
         cmds.connectAttr( ikSpline[-1]+".worldSpace[0]", crvLen+".inputCurve" )
          
@@ -403,7 +403,7 @@ def nonTwitchSquachRig(jntLen, bendDirection, name ):
     ikSpline = cmds.ikHandle( sj= bttmJnt, ee= topJnt, sol = "ikSplineSolver", createCurve=1, n = name + "squach_ik", rootOnCurve=True, 
     parentCurve=False, simplifyCurve = False )
     cmds.skinCluster( topCtlJnt[0], bttmCtlJnt[0],  ikSpline[-1], n=name+"Squach_skin" )
-    #connect curveInfo node to get curve length 
+    #connect curveInfo node to get curve browLength
     crvLen = cmds.shadingNode( "curveInfo", asUtility=1, n = name+"Stretch_crvInfo" )
     cmds.connectAttr( ikSpline[-1]+".worldSpace[0]", crvLen+".inputCurve" )
      

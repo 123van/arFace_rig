@@ -1,24 +1,26 @@
 from maya import cmds
 import maya.mel as mel
-from conLibrary import app
-reload(app)
+# from conLibrary import app
+# reload(app)
 from conLibrary import controllerLibTest
 reload(controllerLibTest)
 from arFace.Misc import Core
 from functools import partial
-from twitchScript.face import face_utils, rigStructure, faceFactor, faceSkin, curve_utils
+from twitchScript.face import face_utils, rigStructure, faceFactor, faceSkin, curve_utils, blendShapeFunc
 reload(face_utils)
 reload(faceFactor)
 reload(faceSkin)
 reload(curve_utils)
+reload(blendShapeFunc)
+
 import os
 from twitchScript.brow import browRig
 reload(browRig)
 from twitchScript.eyeLid import eyeMirrorRig
 reload(eyeMirrorRig)
-from twitchScript.jaw import jawConstraintRig, jawRig
+from twitchScript.jaw import jawConstraintRig, lipShapeRig
 reload(jawConstraintRig)
-reload(jawRig)
+reload(lipShapeRig)
 
 #- load necessary plugin
 # if not cmds.pluginInfo('matrixNodes.mll', loaded = True, q = True):
@@ -45,6 +47,7 @@ class ArcFaceUI(face_utils.Util):
         #self.util = face_utils.Util()
         self.browClass = None
         self.eyeLidClass = None
+        self.jawRigClass = None
         self.skin = None
         self.ctlLib = None
         self.ctl = None
@@ -56,6 +59,8 @@ class ArcFaceUI(face_utils.Util):
         self.textColor = [0.64, 0.42, 0.33]
         self.buttonColor = [0.8, 0.7, 0.6]
         self.directory = createDirectoryTest()
+        self.targetsForCtls = {}
+        self.BSClass = None
 
     def show(self):
 
@@ -138,6 +143,7 @@ class ArcFaceUI(face_utils.Util):
 
         cmds.text(label='')
         cmds.button(label='Store FaceLocator', bgc=self.buttonColor, command=self.setupLocator)
+
         if self.guideData:
             insertText = str(self.guideData.keys())
         else:
@@ -154,7 +160,7 @@ class ArcFaceUI(face_utils.Util):
         cmds.text(label='')
         cmds.text(label="Select 'face part'")
         cmds.text(label=" Store In Order ")
-        cmds.text(label="Select Left Side")
+        cmds.text(label="Select Left In Order")
         cmds.text(label='')
 
         cmds.text(label='')
@@ -181,7 +187,7 @@ class ArcFaceUI(face_utils.Util):
         self.spaceBetween(1, 4, "text")
         self.vertexData = self.createVtxData()
         cmds.text(label='')
-        cmds.button(label='Brow Select', bgc =self.buttonColor, c=partial(self.selectVertexes, 'eyebrowVertsTextField'))
+        cmds.button(label='Brow Select', bgc =self.buttonColor, c=partial(self.selectVertices, 'eyebrowVertsTextField'))
         if self.vertexData.has_key('browVerts'):
             insertText = self.vertexData['browVerts']
         else:
@@ -189,7 +195,7 @@ class ArcFaceUI(face_utils.Util):
         self.eyebrowVertsTextField = cmds.textField('eyebrowVertsTextField', ed=False, tx=str(insertText), w=240)
         self.spaceBetween(1, 2, "text")
 
-        cmds.button(label='Up EyeLid Select', bgc=self.buttonColor, c=partial(self.selectVertexes, 'upEyelidVertsTextField'))
+        cmds.button(label='Up EyeLid Select', bgc=self.buttonColor, c=partial(self.selectVertices, 'upEyelidVertsTextField'))
         if self.vertexData.has_key('upLidVerts'):
             insertText = self.vertexData['upLidVerts']
         else:
@@ -198,7 +204,7 @@ class ArcFaceUI(face_utils.Util):
 
         self.spaceBetween(1, 2, "text")
 
-        cmds.button(label='Low EyeLid Select', bgc=self.buttonColor, c=partial(self.selectVertexes, 'loEyelidVertsTextField'))
+        cmds.button(label='Low EyeLid Select', bgc=self.buttonColor, c=partial(self.selectVertices, 'loEyelidVertsTextField'))
         if self.vertexData.has_key('loLidVerts'):
             insertText = self.vertexData['loLidVerts']
         else:
@@ -207,7 +213,7 @@ class ArcFaceUI(face_utils.Util):
 
         self.spaceBetween(1, 2, "text")
 
-        cmds.button(label='Up Lip Select', bgc=self.buttonColor, c=partial(self.selectVertexes, 'upLipVertsTextField'))
+        cmds.button(label='Up Lip Select', bgc=self.buttonColor, c=partial(self.selectVertices, 'upLipVertsTextField'))
         if self.vertexData.has_key('upLipVerts'):
             insertText = self.vertexData['upLipVerts']
         else:
@@ -216,7 +222,7 @@ class ArcFaceUI(face_utils.Util):
 
         self.spaceBetween(1, 2, "text")
 
-        cmds.button(label='Low Lip Select', bgc=self.buttonColor, c=partial(self.selectVertexes, 'loLipVertsTextField'))
+        cmds.button(label='Low Lip Select', bgc=self.buttonColor, c=partial(self.selectVertices, 'loLipVertsTextField'))
         if self.vertexData.has_key('loLipVerts'):
             insertText = self.vertexData['loLipVerts']
         else:
@@ -224,7 +230,7 @@ class ArcFaceUI(face_utils.Util):
         self.loLipVertsTextField = cmds.textField('loLipVertsTextField', ed=False, tx=str(insertText), w = 240)
         self.spaceBetween(1, 2, "text")
 
-        #cmds.button(label='Update Vtx Selection', bgc=self.buttonColor, command= self.updateVtxSelection)
+        cmds.button(label='Update Vtx Selection', bgc=self.buttonColor, command= self.updateVtxSelection)
         self.spaceBetween(1, 3, "text")
 
         cmds.setParent('..')
@@ -257,7 +263,7 @@ class ArcFaceUI(face_utils.Util):
         self.spaceBetween(1, 8, "text")
 
         cmds.text(label='')
-        cmds.text(label='Number of Ctl')
+        cmds.text(label='Total Number of Ctl')
         cmds.text(label='Number of Vtx')
         cmds.text(label='Extra Layer')
         self.spaceBetween(1, 2, "text")
@@ -267,10 +273,9 @@ class ArcFaceUI(face_utils.Util):
         cmds.menuItem(label=9)
         cmds.menuItem(label=11)
         cmds.menuItem(label=13)
-        cmds.optionMenu('jointMultiple', bgc=[0, 0, 0], changeCommand=self.printNewMenuItem)
+        cmds.optionMenu('browJointMultiple', bgc=[0, 0, 0], changeCommand=self.printNewMenuItem)
         cmds.menuItem(label='Single')
         cmds.menuItem(label='Double')
-        cmds.menuItem(label='Triple')
         cmds.menuItem(label='Every')
         cmds.optionMenu('extraBrowUpLoChain', bgc=[0, 0, 0], changeCommand=self.printNewMenuItem)
         cmds.menuItem(label='Lower')
@@ -280,17 +285,17 @@ class ArcFaceUI(face_utils.Util):
             #edgeLoop = self.util.checkEdgeLoopWithSelectedVtx(self.vertexData['browVerts'])
             edgeLoop = self.checkEdgeLoopWithSelectedVtx(self.vertexData['browVerts'])
             if edgeLoop:
-                cmds.optionMenu("jointMultiple", e=1, value="Every")
+                cmds.optionMenu("browJointMultiple", e=1, value="Every")
             else:
                 vtxLength = len(self.vertexData['browVerts'])
                 if cmds.attributeQuery("browJntList", node="browFactor", exists=1):
                     jntLength = len(cmds.getAttr("browFactor.browJntList"))
                     jntMult = (jntLength+1) / vtxLength
                     if jntMult == 0:
-                        cmds.optionMenu('jointMultiple', e=1, value="Single")
+                        cmds.optionMenu('browJointMultiple', e=1, value="Single")
                     else:
-                        multiple = ["Single", "Double", "Triple"]
-                        cmds.optionMenu('jointMultiple', e=1, value=multiple[jntMult-1])
+                        multiple = ["Single", "Double"]
+                        cmds.optionMenu('browJointMultiple', e=1, value=multiple[jntMult-1])
 
             if cmds.attributeQuery("ctlList", node="browFactor", exists=1):
                 browCtlLength = len(cmds.getAttr("browFactor.ctlList"))
@@ -312,15 +317,15 @@ class ArcFaceUI(face_utils.Util):
         cmds.text(label='Eyelid Setup', bgc=[.12, .2, .30], fn="boldLabelFont", height=20)
         self.spaceBetween(1, 9, "text")
 
-        cmds.text(label='select ctl')
+        cmds.text(label='Up/Low number of ctl')
         cmds.text(label=' change number : Ctl/Multi')
         cmds.text(label='')
         self.spaceBetween(1, 2, "text")
 
         cmds.optionMenu('numOfEyeMidCtl', bgc=[0, 0, 0], changeCommand=self.printNewMenuItem)
         cmds.menuItem(label=5)
+        cmds.menuItem(label=6)
         cmds.menuItem(label=7)
-        cmds.menuItem(label=9)
         cmds.optionMenu('eyeJointMultiple', bgc=[0, 0, 0], changeCommand=self.printNewMenuItem)
         cmds.menuItem(label='Every')
         cmds.menuItem(label='Half')
@@ -352,6 +357,22 @@ class ArcFaceUI(face_utils.Util):
         cmds.menuItem(label='Half')
         cmds.text(label='reset the optionMenu')
 
+        jawMultValue = cmds.optionMenu('jawJntNumber', q=True, value=True)
+        if cmds.objExists("lipFactor"):
+            for upLow in ["up", "lo"]:
+                if cmds.attributeQuery(upLow + "LipVerts", node="lipFactor", exists=1):
+                    orderedVerts = cmds.getAttr("lipFactor." + upLow + "LipVerts")
+
+                if jawMultValue == "Every":
+                    self.lipOrderVtx[upLow] = orderedVerts
+
+                elif jawMultValue == "Half":
+                    center = (len(orderedVerts)-1)/2
+                    right = orderedVerts[:center][::2]
+                    leftTemp = orderedVerts[center+1:][::-1][::2]
+                    left = leftTemp[::-1]
+                    self.lipOrderVtx[upLow] = right + [orderedVerts[center]] + left
+
         self.spaceBetween(1, 2, "text")
         cmds.button(label='Jaw Rig', bgc=self.buttonColor, command=self.jawConstRig)
         cmds.button(label='lipShape Rig', bgc=self.buttonColor, command=self.lipShapeRig)
@@ -376,7 +397,9 @@ class ArcFaceUI(face_utils.Util):
         cmds.button(label='Update FaceClusters', bgc=self.buttonColor, command=self.updateFaceCluster)
         self.spaceBetween(1, 7, "text")
         cmds.text(label='source cluster')
-        self.spaceBetween(1, 3, "text")
+        cmds.text(label='create "browDn_cls_set"!!')
+        cmds.text(label='(for skinWgt calculation)')
+        self.spaceBetween(1, 1, "text")
 
         cmds.separator(h=15)
         cmds.optionMenu('clusterName', bgc=[0, 0, 0], highlightColor=[0.9, 0.5, 0.4], changeCommand=self.printNewMenuItem)
@@ -389,7 +412,7 @@ class ArcFaceUI(face_utils.Util):
         cmds.menuItem(label='lip_cls')
         cmds.menuItem(label='jawFat_cls')
         cmds.menuItem(label='chin_cls')
-        cmds.menuItem(label='upLipRoll_cls')
+        cmds.menuItem(label='lipRoll_cls')
         cmds.menuItem(label='bttmLipRoll_cls')
         cmds.menuItem(label='lipRoll_cls')
         cmds.menuItem(label='squintPuff_cls')
@@ -405,7 +428,8 @@ class ArcFaceUI(face_utils.Util):
         cmds.button(label='Select WeightedVtx', bgc=self.buttonColor, command=self.selectWeightedVerts)
         self.spaceBetween(1, 2, "text")
         cmds.text(label='target cluster')
-        self.spaceBetween(1, 4, "text")
+        self.spaceBetween(1, 3, "text")
+        cmds.text(label='+ -')
 
         cmds.optionMenu('targetClusterName', bgc=[0, 0, 0], highlightColor=[0.9, 0.5, 0.4], changeCommand=self.printNewMenuItem)
         cmds.menuItem(label='browUp_cls')
@@ -417,7 +441,7 @@ class ArcFaceUI(face_utils.Util):
         cmds.menuItem(label='lip_cls')
         cmds.menuItem(label='jawFat_cls')
         cmds.menuItem(label='chin_cls')
-        cmds.menuItem(label='upLipRoll_cls')
+        cmds.menuItem(label='lipRoll_cls')
         cmds.menuItem(label='bttmLipRoll_cls')
         cmds.menuItem(label='lipRoll_cls')
         cmds.menuItem(label='squintPuff_cls')
@@ -428,8 +452,9 @@ class ArcFaceUI(face_utils.Util):
 
         cmds.text(label='choose target cluster')
         cmds.text(label='select head geo')
-        self.spaceBetween(1, 2, "text")
+        self.spaceBetween(1, 1, "text")
 
+        cmds.checkBox('clsXDirection', label='')
         cmds.button(label='Copy Cls Weight', bgc=self.buttonColor, command=self.copyClusterWeight)
         cmds.button(label='indie Cls Mirror', bgc=self.buttonColor, command=self.indiClsMirrorWeight)
         cmds.button(label='AllCls Mirror', bgc=self.buttonColor, command=self.allClsMirrorWeight)
@@ -492,6 +517,16 @@ class ArcFaceUI(face_utils.Util):
         cmds.button(label='Symmetrize Crv', bgc=self.buttonColor, command=self.symmetrizeCrv)
         cmds.text(label='')
         cmds.button(label='Skin Wrap', bgc=self.buttonColor, command=self.create_shrink_wrap)
+        self.spaceBetween(1, 7, "text")
+
+        # cmds.text(label='BS Curve tool', bgc=[.12, .2, .30], fn="boldLabelFont", height=20)
+        # self.spaceBetween(1, 9, "text")
+
+        cmds.button(label='Copy CurveShape', bgc=self.buttonColor, command=self.copyCurveShape)
+
+        cmds.button(label='Mirror CurveShape', bgc=self.buttonColor, command=self.mirrorCurveShape)
+
+        cmds.button(label='Reset Curve', bgc=self.buttonColor, command=self.resetBS_targetCrv)
         self.spaceBetween(1, 12, "text")
 
         cmds.text(label='Map Skinning', bgc=[.12, .2, .30], fn="boldLabelFont", height=20)
@@ -507,16 +542,81 @@ class ArcFaceUI(face_utils.Util):
         self.spaceBetween(1, 7, "text")
 
         cmds.button(label='Calculate Skin', bgc=self.buttonColor, command=self.calculateSkinWgt)
-        #cmds.button(label='Update SurfMap', command=self.updateSurfMap) resetArFaceCtl
         cmds.button(label='HeadSkin Object', bgc=self.buttonColor, command=self.headSkinObject)
         cmds.button(label='Reset ArFaceCtl', bgc=self.buttonColor, command=self.resetArFaceCtl)
+        self.spaceBetween(1, 12, "text")
+
 
         cmds.setParent('..')
+        cmds.setParent('..')
+
+        ctl_lenShape = cmds.columnLayout()
+        cmds.rowColumnLayout(numberOfColumns=5, bgc=[0.25, 0.3, 0.3],
+                             columnWidth=[(1, 20), (2, 120), (3, 120), (4, 120), (5, 20)],
+                             columnOffset=[(1, 'right', 5)])
+        self.spaceBetween(1, 6, "text")
+
+        cmds.text(label='BS Ctl setup', bgc=[.12, .2, .30], fn="boldLabelFont", height=20)
+        self.spaceBetween(1, 9, "text")
+
+        cmds.button(label='Plus Targets', bgc=self.buttonColor, c=partial(self.selectPlusTargets, 'plusTargets'))
+        self.plusTextField = cmds.textField('plusTargets', ed=True, tx='', w=240)
+        self.spaceBetween(1, 3, "text")
+
+        cmds.button(label='Minus Targets', bgc=self.buttonColor, c=partial(self.selectMinusTargets, 'minusTargets'))
+        self.minusTextField = cmds.textField('minusTargets', ed=True, tx='', w=240)
+        self.spaceBetween(1, 3, "text")
+
+        cmds.text(label='XYZ Axis ')
+        cmds.text(label='Select Ctrls ')
+        cmds.text(label=' ')
+        self.spaceBetween(1, 2, "text")
+
+        cmds.optionMenu('xyzAxis', bgc=[0, 0, 0], changeCommand=self.printNewMenuItem)
+        cmds.menuItem(label="x")
+        cmds.menuItem(label="y")
+        cmds.menuItem(label="z")
+
+        cmds.button(label='Basic Ctl BsConnect', bgc=self.buttonColor, c=self.basicCtl_connect)
+        self.spaceBetween(1, 8, "text")
+
+        cmds.text(label='Twitch BlendShape', bgc=[.12, .2, .30], fn="boldLabelFont", height=20)
+        self.spaceBetween(1, 9, "text")
+
+        cmds.text(label='   select base   ', fn="boldLabelFont", height=20)
+        self.spaceBetween(1, 4, "text")
+        cmds.button(label='split BS Weight', bgc=self.buttonColor, command=self.splitBSWeightMap)
+        cmds.button(label='create twitchBS', bgc=self.buttonColor, command=self.createTwitchBS)
+        cmds.button(label='weight transfer', bgc=self.buttonColor, command=self.weightTransfer)
+        self.spaceBetween(1, 7, "text")
+
+        cmds.text(label='Deformer on the Geo with')
+        cmds.text(label='same vertex order as the')
+        cmds.text(label='headGeo                          ')
+        self.spaceBetween(1, 2, "text")
+
+        cmds.button(label='Weight Source Dformer', bgc=self.buttonColor, c=self.setWeightedDeformer)
+        self.weightedDeformer = cmds.textField('weightedDeformer', ed=True, tx='', w=240)
+        self.spaceBetween(1, 3, "text")
+
+        cmds.text(label=' Weighted Influences ', bgc=self.buttonColor)
+        self.weightedItems = cmds.textField('weightedItems', ed=True, tx='', w=240)
+        self.spaceBetween(1, 8, "text")
+
+        cmds.text(label=' select target & baseGeo ')
+        cmds.text(label=' mapSkinGeo & sculpted')
+        cmds.text(label=' !!joint must have value')
+        self.spaceBetween(1, 2, "text")
+        cmds.button(label='Add Corrective & Reset', bgc=self.buttonColor, c=self.addCorrective_reset)
+        cmds.button(label='bakeWgt To Corrective', bgc=self.buttonColor, c=self.bakeWeight_toCorrective)
+        cmds.text(label=' only in rx or ry')
 
         cmds.tabLayout(tabs,
                        edit=True,
                        tabLabel=((runAllTab, 'Run It All'),
-                                 (skinTab, 'Skinning'))
+                                 (skinTab, 'Skinning'),
+                                 (ctl_lenShape, 'Ctl / BlendShape'))
+
                        )
 
         # ,
@@ -525,6 +625,162 @@ class ArcFaceUI(face_utils.Util):
         # (lipTab, 'lip'),
         # (skinningTab, 'skinning'),
         # (factorTab, 'Factors')
+
+    def splitBSWeightMap(self, *args):
+
+        blendShapeFunc.splitBSWeightMap()
+
+    def createTwitchBS(self, *args):
+
+        # if not self.BSClass:
+        #     self.BSClass = blendShapeFunc.BlendShapeFunc()
+        blendShapeFunc.createTwitchBS()
+
+    def weightTransfer(self, *args):
+        print('please add user input for weightTransfer')
+        pass
+
+    def setWeightedDeformer(self, *args):
+
+        dformer = cmds.ls(sl=1)[0]
+        cmds.textField('weightedDeformer', e=1, tx=str(dformer))
+
+        weightedObjList = []
+        if cmds.nodeType(dformer) == 'skinCluster':
+            if ":" in dformer:
+                deformer = dformer.split(':')[1]
+
+            facePart = deformer.split('Map')[0]
+            if facePart == 'brow':
+                jntList = cmds.getAttr('browFactor.browJntList')
+
+            elif facePart == 'lip':
+                upJntList = cmds.getAttr('lipFactor.upLipJnt')
+                loJntList = cmds.getAttr('lipFactor.loLipJnt')
+                cornerJntList = cmds.getAttr('lipFactor.cornerLipJnt')
+                jntList = [cornerJntList[0]] + upJntList + [cornerJntList[1]] + loJntList
+
+            wgtJnts = cmds.skinCluster(dformer, q=1, wi=1)
+            for jnt in jntList:
+                childJnt = cmds.listRelatives(jnt, ad=1, type='joint')[0]
+                weightedJnt = [jot for jot in wgtJnts if childJnt in jot][0]
+                weightedObjList.append(weightedJnt)
+
+        elif cmds.nodeType(dformer) == 'blendShape':
+
+            aliasList = cmds.aliasAttr(dformer, q=1)
+            weightedObjList = [tgt for tgt, wgt in zip(*[iter(aliasList)]*2)]
+
+        else:
+            print("let's add other deformer")
+            pass
+
+        length = len(weightedObjList)
+        targetText = str()
+        for index in range(length):
+            if index == length-1:
+                targetText += weightedObjList[index]
+            else:
+                targetText += weightedObjList[index] + ','
+
+        cmds.textField('weightedItems', e=1, tx=str(targetText))
+
+    def bakeWeight_toCorrective(self, *args):
+
+        weightedDformer = cmds.textField('weightedDeformer', q=1, tx=1)
+        weightedItems = cmds.textField('weightedItems', q=1, tx=1)
+        if not weightedDformer and not weightedItems:
+
+            raise RuntimeError('store targets first!!')
+
+        if "," in weightedItems:
+            wgtItemList = [x.strip() for x in weightedItems.split(',')]
+
+        else:
+            wgtItemList = [weightedItems]
+
+        print(wgtItemList)
+        sculptedGeo = cmds.ls(sl=1, type='transform')[0]
+        if not self.BSClass:
+            self.BSClass = blendShapeFunc.BlendShapeFunc()
+        self.BSClass.bakeWeight_toCorrective(weightedDformer, wgtItemList, sculptedGeo)
+
+    def addCorrective_reset(self, *args):
+        """
+        select target first and headGeo ( just add target in blendShape)
+        """
+        mySel = cmds.ls(os=1, type='transform')
+        target = mySel[0]
+        baseGeo = mySel[1]
+        if not self.BSClass:
+            self.BSClass = blendShapeFunc.BlendShapeFunc()
+        self.BSClass.addCorrectiveReset(target, baseGeo)
+
+    def jntWeight_toCorrective(self, *args):
+
+        mySel = cmds.ls(os=1, type='transform')
+        mapSkinHead = mySel[0]
+        sculptedGeo = mySel[1]
+
+        if not self.BSClass:
+            self.BSClass = blendShapeFunc.BlendShapeFunc()
+
+        self.BSClass.jntWeight_toCorrective(mapSkinHead, sculptedGeo)
+
+    def selectPlusTargets(self, txField, *args):
+
+        plusTargets = cmds.ls(sl=1)
+
+        # if not cmds.attributeQuery("plusTargets", node="helpPanel_grp", exists=1):
+        #     cmds.addAttr('helpPanel_grp', ln='plusTargets', dt='stringArray')
+        # cmds.setAttr('helpPanel_grp.plusTargets', type="stringArray", *plusTargets)
+        length = len(plusTargets)
+        targetText = str()
+        for index in range(length):
+            if index == length-1:
+                targetText += plusTargets[index]
+            else:
+                targetText += plusTargets[index] + ','
+
+        cmds.textField(txField, e=1, tx=str(targetText))
+
+    def selectMinusTargets(self, txField, *args):
+
+        minusTargets = cmds.ls(sl=1)
+        length = len(minusTargets)
+        tgtText = str()
+        for index in range(length):
+            if index == length-1:
+                tgtText += minusTargets[index]
+            else:
+                tgtText += minusTargets[index] + ','
+
+        cmds.textField(txField, e=1, tx=str(tgtText))
+
+    def basicCtl_connect(self, *args):
+
+        plusTarget = cmds.textField(self.plusTextField, q=1, tx=1)
+        minusTarget = cmds.textField(self.minusTextField, q=1, tx=1)
+        if not plusTarget and not minusTarget:
+
+            raise RuntimeError('store targets first!!')
+
+        if "," in plusTarget:
+            plusList = plusTarget.split(',')
+            minusList = minusTarget.split(',')
+
+        else:
+            plusList = [plusTarget]
+            minusList = [minusTarget]
+
+        if not plusList and not minusList:
+            raise RuntimeError('store valid targets first!!')
+
+        print(plusList, minusList)
+        ctlSel = cmds.ls(sl=1, type='transform')
+        xyz = cmds.optionMenu('xyzAxis', q=1, value=True)
+
+        blendShapeFunc.simpleCtl_bsConnect(ctlSel, xyz, plusList, minusList, range='')
 
     def spaceBetween(self, numOfRow, numOfColm, space=""):
 
@@ -578,7 +834,7 @@ class ArcFaceUI(face_utils.Util):
 
                 currentGuides = cmds.listRelatives("allPos", ad=1, ni=1, type="transform")
 
-                if cmds.attributeQuery("allPos", node="helpPanel_grp", exists=1):
+                if cmds.attributeQuery("headSkelPos", node="helpPanel_grp", exists=1):
 
                     guideList = cmds.listAttr("helpPanel_grp", ud=1)
 
@@ -618,7 +874,7 @@ class ArcFaceUI(face_utils.Util):
         locData = self.storeLocator(self.guideData)
         cmds.textField(self.setupLocTextField, e=True, tx=str(locData))
 
-    def selectVertexes(self, txtField, *args):
+    def selectVertices(self, txtField, *args):
         """
         select vertexes in text field
         """
@@ -635,22 +891,52 @@ class ArcFaceUI(face_utils.Util):
         Returns:
 
         """
+        currentName = self.optionMenu_refresh("eye_lip_brow")
+
+        vrtSelection = cmds.ls(os=1, fl=1)
+
         self.vertexData = self.createVtxData()
 
-        if self.vertexData["browVerts"]:
+        if currentName == "brow":
+
+            orderedVerts = vrtSelection
+
+            if not cmds.attributeQuery("browVerts", node="browFactor", exists=1):
+                cmds.addAttr("browFactor", ln="browVerts", dt="stringArray")
+
+            cmds.setAttr("browFactor.browVerts", type="stringArray", *([len(orderedVerts)] + orderedVerts))
+
+            self.vertexData["browVerts"] = orderedVerts
             cmds.textField(self.eyebrowVertsTextField, e=True, tx=str(self.vertexData["browVerts"]))
 
-        if self.vertexData["l_upLidVerts"]:
-            pass
+        elif currentName == "eye":
 
-        if self.vertexData["l_loLidVerts"]:
-            pass
+            upLidVerts = vrtSelection
+            loLidVerts = vrtSelection
 
-        if self.vertexData["upLipVerts"]:
-            pass
+            if not cmds.attributeQuery("l_upLidVerts", node="lidFactor", exists=1):
+                cmds.addAttr("lidFactor", ln="l_upLidVerts", dt="stringArray")
 
-        if self.vertexData["loLipVerts"]:
-            pass
+            cmds.setAttr("lidFactor.l_upLidVerts", type="stringArray", *([len(upLidVerts)] + upLidVerts))
+
+            self.vertexData["l_upLidVerts"] = upLidVerts
+            cmds.textField(self.eyebrowVertsTextField, e=True, tx=str(self.vertexData["l_upLidVerts"]))
+
+            if not cmds.attributeQuery("l_loLidVerts", node="lidFactor", exists=1):
+                cmds.addAttr("lidFactor", ln="l_loLidVerts", dt="stringArray")
+
+            cmds.setAttr("lidFactor.l_loLidVerts", type="stringArray", *([len(loLidVerts)] + loLidVerts))
+
+            self.vertexData["l_loLidVerts"] = loLidVerts
+            cmds.textField(self.eyebrowVertsTextField, e=True, tx=str(self.vertexData["l_loLidVerts"]))
+
+        elif currentName == "lip":
+
+            if self.vertexData["upLipVerts"]:
+                pass
+
+            if self.vertexData["loLipVerts"]:
+                pass
 
     def setOrderedVert_upLo(self, *pArgs):
         #cmds.optionMenu('eye_lip_brow', query=True, value=True)
@@ -667,7 +953,7 @@ class ArcFaceUI(face_utils.Util):
             edgeLoop = self.checkEdgeLoopWithSelectedVtx(orderedVtx)
 
             if edgeLoop:
-                cmds.optionMenu("jointMultiple", e=1, value="Every")
+                cmds.optionMenu("browJointMultiple", e=1, value="Every")
             else:
                 raise RuntimeError("can not create an edgeLoop")
 
@@ -701,12 +987,12 @@ class ArcFaceUI(face_utils.Util):
 
             self.vertexData = self.createVtxData()
 
-            vtxLength = len(self.vertexData['browVerts'])
-            if cmds.attributeQuery("browJntList", node="browFactor", exists=1):
-                jntLength = len(cmds.getAttr("browFactor.browJntList"))
-                jntMult = (jntLength+1) / vtxLength
-                multiple = ["Single", "Double", "Triple"]
-                cmds.optionMenu('jointMultiple', e=1, value=multiple[jntMult-1])
+            self.vertexData['browVerts'] = vtxList
+            # if cmds.attributeQuery("browJntList", node="browFactor", exists=1):
+            #     jntLength = len(cmds.getAttr("browFactor.browJntList"))
+            #     jntMult = (jntLength+1) / vtxLength
+            #     multiple = ["Single", "Double", "Triple"]
+            #     cmds.optionMenu('browJointMultiple', e=1, value=multiple[jntMult-1])
 
         else:
             pass
@@ -784,7 +1070,7 @@ class ArcFaceUI(face_utils.Util):
         guideList = cmds.listAttr(helpPanelGroup, ud=1)
         if guideList:
             if "allPos" in guideList:
-                print("shit")
+
                 basePos = cmds.getAttr("{}.allPos".format(helpPanelGroup))
                 cmds.xform("allPos", t=basePos, ws=1)
                 guideList.remove("allPos")
@@ -792,9 +1078,9 @@ class ArcFaceUI(face_utils.Util):
                 for guide in guideList:
                     if guide in locList:
                         if not cmds.listRelatives(guide, p=1)[0] == "allPos":
-                            print (guide)
+
                             cmds.parent(guide, "allPos")
-                        print(guide)
+
                         pos = cmds.getAttr("{}.{}".format(helpPanelGroup, guide))
                         cmds.xform(guide, t=pos, ws=1)
 
@@ -904,7 +1190,7 @@ class ArcFaceUI(face_utils.Util):
 
     def browRigBuild(self, *pArgs):
 
-        jntMultiple = self.optionMenu_refresh("jointMultiple")
+        jntMultiple = self.optionMenu_refresh("browJointMultiple")
         print(jntMultiple)
         self.browClass = browRig.BrowRig()
         numberOfCtl = self.optionMenu_refresh("numOfBrowCtl")
@@ -929,11 +1215,12 @@ class ArcFaceUI(face_utils.Util):
         if not self.browClass:
             self.browClass = browRig.BrowRig()
 
+        print(uplo)
         self.browClass.browWideJnt(uplo, int(numOfCtl))
 
     def rebuildBrowRig(self, *pArgs):
         numOfCtl = self.optionMenu_refresh("numOfBrowCtl")
-        jntMultiple = self.optionMenu_refresh("jointMultiple")
+        jntMultiple = self.optionMenu_refresh("browJointMultiple")
 
         myCtl = ""
         if cmds.attributeQuery("controller", node="helpPanel_grp", exists=1):
@@ -987,22 +1274,15 @@ class ArcFaceUI(face_utils.Util):
             raise RuntimeError("import ControlPanel first!!")
 
         self.lipJntMultChange()
-        jawConstRig = jawConstraintRig.JawConstraintRig(self.lipOrderVtx)
-        jawConstRig.build()
+        self.jawRigClass = jawConstraintRig.JawConstraintRig(self.lipOrderVtx)
+        self.jawRigClass.build()
 
     def lipShapeRig(self, *pArgs):
         #cmds.optionMenu('numOfLipCtl', query=True, value=True)
         numOfLipCtl = self.optionMenu_refresh("numOfLipCtl")
-        lipShapeRig = jawRig.JawRig(int(numOfLipCtl), self.lipOrderVtx)
+        lipShpRig = lipShapeRig.LipShapeRig(int(numOfLipCtl), self.lipOrderVtx)
 
-        lipShapeRig.lipShapeRigSetup()
-
-        myCtl = ""
-        if cmds.attributeQuery("controller", node="helpPanel_grp", exists=1):
-            myCtl = cmds.getAttr("helpPanel_grp.controller")
-
-        lipShapeRig.lipJntForBSCrv(int(numOfLipCtl))
-        lipShapeRig.lipFreeCtl(int(numOfLipCtl), myCtl)
+        lipShpRig.lipShapeBuild()
 
     def importClusterPanel(self, *pArgs):
         """
@@ -1036,7 +1316,7 @@ class ArcFaceUI(face_utils.Util):
         # select browCrv / headGeo in order
         faceSkin.createVtxSet(selectedCluster)
 
-        # lipRollDict = {"upLipRoll_cls": "lo", "bttmLipRoll_cls": "up"}
+        # lipRollDict = {"lipRoll_cls": "lo", "bttmLipRoll_cls": "up"}
         # if selectedCluster in lipRollDict.keys():
         #     lipRollSet = cmds.getAttr("helpPanel_grp.{}_set".format(selectedCluster))
         #     lipVerts = cmds.ls(cmds.getAttr("lipFactor.{}LipVerts".format(lipRollDict[selectedCluster])), fl=1)
@@ -1083,8 +1363,9 @@ class ArcFaceUI(face_utils.Util):
 
     def indiClsMirrorWeight(self, *pArgs):
         #cmds.optionMenu('targetClusterName', query=True, value=True)
+        checkCls = cmds.checkBox('clsXDirection', query=True, value=True)
         targetCls = self.optionMenu_refresh("targetClusterName")
-        faceSkin.faceClsMirrorWgt(targetCls, "indi")
+        faceSkin.faceClsMirrorWgt(targetCls, "indi", direction=checkCls)
 
     def allClsMirrorWeight(self, *pArgs):
         #cmds.optionMenu('targetClusterName', query=True, value=True)
@@ -1127,7 +1408,7 @@ class ArcFaceUI(face_utils.Util):
         #cmds.optionMenu('facePartName', query=True, value=True)
         name = self.optionMenu_refresh("facePartName")
         #cmds.optionMenu('jointMultiple', query=True, value=True)
-        numOfVtx = self.optionMenu_refresh("jointMultiple")
+        numOfVtx = self.optionMenu_refresh("browJointMultiple")
         #cmds.optionMenu('crvCharacterName', query=True, value=True)
         nature = self.optionMenu_refresh("crvCharacterName")
         selection = cmds.ls(os=1, fl=1)
@@ -1180,6 +1461,21 @@ class ArcFaceUI(face_utils.Util):
         else:
 
             curve_utils.symmetrizeCloseCrv(crvSel[0], direction=check)
+
+    def resetBS_targetCrv(self, *pArgs):
+
+        selCrv = cmds.ls(sl=1, type='transform')
+        curve_utils.resetBStargetCrv(selCrv)
+
+    def copyCurveShape(self, *pArgs):
+
+        selCrv = cmds.ls(os=1, long=1, type="transform")
+        curve_utils.copyCurveShape(selCrv)
+
+    def mirrorCurveShape(self, *pArgs):
+
+        selCrv = cmds.ls(os=1, long=1, type="transform")
+        curve_utils.mirrorCurveShape(selCrv)
 
     def loftMapSurface(self, *pArgs):
 

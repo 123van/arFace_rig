@@ -7,7 +7,9 @@ import re
 import os
 import math
 from twitchScript import twitchPanelConnect
-from twitchScript import blendShapeMethods
+from twitchScript.face import face_utils
+reload(face_utils )
+
 '''
 1. store head info ( head name / brow, eye, lip vertices in order )
 a. Brow: manually select brow vertices(left side to mirror ) : stored in browFactor
@@ -19,59 +21,121 @@ Aug20 swtichJntToCls / curveOnEdgeLoop fix( checking with stored verts not joint
 
 #store head info            
 def headGeo():
-    faceGeo = cmds.ls(sl=1, type = "transform")[0]
-    if cmds.attributeQuery("headGeo", node = "helpPanel_grp", exists=1)==False:
+
+    if not cmds.objExists("helpPanel_grp"):
+        raise RuntimeError("create helpPanel_grp first!!")
+
+    head = cmds.ls(sl=1, type = "transform")[0]
+    if not head:
+        raise RuntimeError("select head geometry")
+
+    if not cmds.attributeQuery("headGeo", node = "helpPanel_grp", exists=1):
         cmds.addAttr( "helpPanel_grp", ln ="headGeo", dt = "string"  )
-    cmds.setAttr("helpPanel_grp.headGeo", faceGeo, type= "string"  ) 
+    cmds.setAttr("helpPanel_grp.headGeo", head, type= "string"  )
+
+    return head
 
 
 #after place all the face locators
-def setupLocator():
-    helpPanelGroup = "helpPanel_grp"
+def setupLocator(guideData):
 
-    if cmds.objExists("faceLoc_grp"):
-        tmpChild = cmds.listRelatives( "allPos", ad=1, ni=1, type = ["nurbsCurve", "locator"] )
-        itemSet = [ cmds.listRelatives(x, p=1)[0] for x in tmpChild ]
-        locSet = set(itemSet)
-        for loc in locSet:
-            if "Mirr" not in loc:
-                pos = cmds.xform( loc, t = True, q = True, ws = True )
-                if cmds.attributeQuery( loc, node = helpPanelGroup, exists=1)==False:
-                    cmds.addAttr( helpPanelGroup, sn =loc, dt='doubleArray' )
-                #store locator world space 
-                cmds.setAttr( helpPanelGroup +"." + loc, pos, type="doubleArray")    
-    else: 
-        cmds.confirmDialog( title='Confirm', message='create faceLoc_grp first!!' )  
-    
+    if not cmds.objExists("helpPanel_grp"):
+        raise RuntimeError('import rigStructure first!!')
+
+    if not cmds.objExists("faceLoc_grp"):
+        raise RuntimeError('import faceLoc_grp first!!')
+
+    helpPanelGroup = "helpPanel_grp"
+    locData = []
+    for loc, pos in guideData.items():
+
+        if "Mirr" not in loc:
+            if not cmds.attributeQuery(loc, node=helpPanelGroup, exists=1):
+                cmds.addAttr(helpPanelGroup, sn=loc, dt='doubleArray')
+            # store locator world space
+            cmds.setAttr(helpPanelGroup + "." + loc, pos, type="doubleArray")
+            locData.append(loc)
+
+    return locData
     
 #store brow vertices in browFactor( selection order: center to left !! )
-def browVerts():
-	myVerts = cmds.ls(os=1, fl=1)
-	vts = cmds.filterExpand( ex=True, sm=31 )
-	vtxNum = len(vts)
-    
-	ordered = vertices_distanceOrder( myVerts )
 
-	if cmds.attributeQuery("browVerts", node = "browFactor", exists=1)==False:
-		cmds.addAttr( "browFactor", ln ="browVerts", dt = "stringArray"  )
-		cmds.setAttr("browFactor.browVerts", type= "stringArray", *([len(ordered)] + ordered))
+def browOrderedVertices():
+    """
+    get the list for left half of browVertices in order
+    """
 
-	else:
-		cmds.setAttr("browFactor.browVerts", type= "stringArray", *([len(ordered)] + ordered))
-                    
+    face_utils.trackSelOrder()
+    vertSel = cmds.ls(os=1, fl=1)
+    if not len(vertSel) == 3:
+        raise RuntimeError("'select 3 vertices on edge loop!'")
+    vertPosDict = {}
+    for vt in vertSel:
+        vertPos = cmds.xform(vt, q=1, ws=1, t=1)
+        vertPosDict[vt] = vertPos
 
+    vertOrder = sorted(vertPosDict.items(), key=lambda x: x[1][0])  # x[1] = [x,y,x]
 
-def selectBrowVerts():    
-    if cmds.attributeQuery("browVerts", node = "browFactor", exists=1)==True:
+    lCornerVert = vertOrder[-1][0]
+    vertSel.remove(lCornerVert)
+
+    rCornerVert = vertSel[0]
+    secondVert = vertSel[-1]
+
+    cmds.select(rCornerVert, secondVert, r=1)
+    ordered = orderedVerts_edgeLoop()
+    startNum = 0
+    endNum = 0
+
+    for idx, vtx in enumerate(ordered):
+        if vtx == rCornerVert:
+            startNum = idx
+
+        elif vtx == lCornerVert:
+            endNum = idx
+            break
+
+    if not endNum:
+        raise RuntimeError("sorry, vertices are not on edge loop. manually select left half vertices!!")
+
+    ordered = ordered[startNum:endNum + 1]
+
+    if not cmds.attributeQuery("browVerts", node = "browFactor", exists=1):
+        cmds.addAttr( "browFactor", ln ="browVerts", dt = "stringArray" )
+
+    cmds.setAttr("browFactor.browVerts", type= "stringArray", *([len(ordered)] + ordered))
+
+    return ordered
+
+def selectBrowVerts():
+
+    if cmds.attributeQuery("browVerts", node = "browFactor", exists=1):
         browVtx = cmds.getAttr("browFactor.browVerts")
         cmds.select(cl=1)
         for bv in browVtx:
             cmds.select(bv, add=1)
-        
     else:
-        print "set brow vertices first!"    
-        
-        
+        print ("set brow vertices first!")
+
+
+def storeManualSelection(selectedVtx, EyeLipBrow):
+
+    if not selectedVtx:
+        raise RuntimeError("manually select left vertices in order")
+
+    mirrorVerts = face_utils.mirrorVertices(selectedVtx)
+    orderedVerts = mirrorVerts[1:][::-1] + selectedVtx
+
+    if EyeLipBrow == "brow":
+        if not cmds.attributeQuery("browVerts", node="browFactor", exists=1):
+            cmds.addAttr("browFactor", ln="browVerts", dt="stringArray")
+
+        cmds.setAttr("browFactor.browVerts", type="stringArray", *([len(orderedVerts)] + orderedVerts))
+
+    else:
+        pass
+
+    return orderedVerts
 
 #select corner loop verts and direction vert (코너 버텍스들를 선택하고 벡터 버텍스 선택)
 #the first vert and last vert are on the edge loop!!!( 첫 코너 버텍스와 벡터 버텍스는 edge loop선 상에 있어야 한다)
@@ -88,8 +152,9 @@ def selectBrowVerts():
 3. selectPref( trackSelectionOrder = 0 ) 
 '''
 def seriesOfEdgeLoopCrv(lipEye ):
+
     if not cmds.selectPref( q=1, trackSelectionOrder = 1 ):
-        cmds.selectPref( c=1, trackSelectionOrder = 1 )
+        cmds.confirmDialog( title='Confirm', message='turn on "trackSelectionOrder" in Pref!!!' )
     myList = cmds.ls( os=1, fl=1)
     posVerts = []
     if lipEye == 'eye':
@@ -104,7 +169,7 @@ def seriesOfEdgeLoopCrv(lipEye ):
         print 'check the vertices selection!!'
     
     else:
-        firstVert = posVerts[0]#first corner vert 
+        firstVert = posVerts[0]#first vertex on the edge
         secondVert = posVerts[-1]#direction vert on loop 
         posVerts.remove(secondVert)
         startVerts = [firstVert]
@@ -134,9 +199,6 @@ def seriesOfEdgeLoopCrv(lipEye ):
                     cmds.select( startVerts[k], r=1 ) 
                     cmds.select( d[0], add=1 )         
                     curveOnEdgeLoop(lipEye)
-        
-
-
 
 
 #make the list of edgeLoop dictionary( { edge: [vert1, vert2]}) 
@@ -152,45 +214,44 @@ def edgeVertDict(edgeList):
 
 
 
-
 #select 2 adjasent vertices ( corner and direction vertex)
 #edge loop상에 있는 버텍스 순서대로 나열한다( for curves )
 def orderedVerts_edgeLoop():
-    
-    myVert = cmds.ls( os=1, fl=1 )
-    if len(myVert)==2:
-        firstVert = myVert[0]
-        secondVert = myVert[1]
-        
-        cmds.select (firstVert,secondVert, r =1)
-        mel.eval('ConvertSelectionToContainedEdges')        
-        firstEdge = cmds.ls( sl=1 )[0]
-        
-        cmds.polySelectSp( firstEdge, loop =1 )
-        edges = cmds.ls( sl=1, fl=1 )
-        edgeDict = edgeVertDict(edges) #{edge: [vert1, vert2], ...}
-        ordered = [firstVert, secondVert]
-        for i in range( len(edges)-2 ):            
-            del edgeDict[firstEdge]
-            #print edgeDict
-            for x, y in edgeDict.iteritems():
-                if secondVert in y:                    
-                    xVerts = y
-                    xVerts.remove(secondVert)
-                    firstEdge = x
-        
-            secondVert = xVerts[0]
-            ordered.append( secondVert )
-        return ordered
-    
-    else:
-        print 'select 2 adjasent vertex!!'
-        
+    """
+    list vertices in order on the edge loop starting from selection
+    Returns:
+
+    """
+
+    myVert = cmds.ls(os=1, fl=1)
+    if not len(myVert) == 2:
+        raise RuntimeError("select 2 vertices right next each other")
+
+    firstVert = myVert[0]
+    secondVert = myVert[1]
+    cmds.select(firstVert, secondVert, r=1)
+    mel.eval('ConvertSelectionToContainedEdges')
+    firstEdge = cmds.ls(sl=1)[0]
+    cmds.polySelectSp(firstEdge, loop=1)
+    edges = cmds.ls(sl=1, fl=1)
+    edgeDict = edgeVertDict(edges)  # {edge: [vert1, vert2], ...}
+    ordered = [firstVert, secondVert]
+    del edgeDict[firstEdge]
+
+    for i in range(len(edges) - 2):
+
+        for edge, vtxList in edgeDict.iteritems():
+            if secondVert in vtxList:
+                vtxList.remove(secondVert)
+                del edgeDict[edge]
+                break
+        secondVert = vtxList[0]
+        ordered.append(secondVert)
+    return ordered
+
         
 
-
-
-# to make oh, oo, u shapes 
+# to make oh, oo, u shapes
 # select 2vertex(center to left) on loop or select vertices in order and shaped curve last 
 # match vertices in edeg loop to the shape curves 
 '''
@@ -219,7 +280,7 @@ def shapeToCurve():
         uParam = getUParam ( pos, targetCrv )
         print uParam        
         dnPOC = cmds.shadingNode ( 'pointOnCurveInfo', asUtility=True, n = 'dnPOC'+ str(i+1).zfill(2))
-        #loc = cmds.spaceLocator ( n = "targetPoc"+ str(i+1).zfill(2))
+        #loc = cmds.spaceLocator ( n = "targetPoc"+ str(index+1).zfill(2))
         cmds.connectAttr (targetCrvShape[0] + ".worldSpace",  dnPOC + '.inputCurve')
         #cmds.setAttr ( dnPOC + '.turnOnPercentage', 1 )
         cmds.setAttr ( dnPOC + '.parameter', uParam )        
@@ -234,15 +295,15 @@ def curveOnEdgeLoop(name):
     myList = cmds.ls( os=1, fl=1)
     allVerts = orderedVerts_edgeLoop()
     if name == "eye":
-    	name = "lid"
+        name = "lid"
     		
     # get the stored vertice for "eye" or "lip"
-    if cmds.attributeQuery( "lo%sVerts"%name.title(), node = name + "Factor", exists=1 )==True:
-    	upVtx = cmds.getAttr( name+ "Factor.up%sVerts"%name.title() )
-    	loVtx = cmds.getAttr( name + "Factor.lo%sVerts"%name.title() )
-    	numOfJnt = len(upVtx) + len(loVtx)-2
+    if not cmds.attributeQuery( "lo%sVerts"%name.title(), node = name + "Factor", exists=1 ):
+        upVtx = cmds.getAttr( name+ "Factor.up%sVerts"%name.title() )
+        loVtx = cmds.getAttr( name + "Factor.lo%sVerts"%name.title() )
+        numOfJnt = len(upVtx) + len(loVtx)-2
     else:
-    	cmds.confirmDialog( title='Confirm', message='Store "%s vertices" first!!'%name.title() )  
+        cmds.confirmDialog( title='Confirm', message='Store "%s vertices" first!!'%name.title() )
     	    
     if numOfJnt == len(allVerts):
         
@@ -260,7 +321,7 @@ def curveOnEdgeLoop(name):
         cmds.confirmDialog( title='Confirm', message='Wrong edgeLoop vertices are selected' )
 
 ''' 
-1. Edge loop과 같은 갯수의 근접한 edge들 선택
+1. Edge loop이 없을때: 같은 갯수의 근접한 edge들 선택
 2. Select eyeLip
 3. RUN → selected edges들이 helpPanel_grp 에 attr로 저장된다.
 4. Selected edges중 첫번째 엣지의 2 버텍스 선택
@@ -278,7 +339,7 @@ def edgeSelection( eyeLip ):
     if eyeLip == 'eye':
         lidJnt = cmds.ls('l_*LidBlink*_jnt', fl=1, type = 'transform')
         numOfJnt = len(lidJnt)
-        print "eyeVerts length is " + str(numOfJnt) 
+        print "eyeVerts browLength is " + str(numOfJnt)
         
     elif eyeLip =='lip':
         lipJnt = cmds.ls('*LipRollP*', fl=1, type = 'transform')
@@ -393,12 +454,12 @@ def symmetrizeLipCrv(direction):
     
         periodic = cmds.getAttr( crvShp[0] + '.form' )
         crvCvs= cmds.ls(crvSel[0]+".cv[*]", l=1, fl=1 )
-        numCv = len(crvCvs)
+        nucmdsv = len(crvCvs)
         
-        numList = [ x for x in range(numCv) ]
+        numList = [ x for x in range(nucmdsv) ]
         if periodic in [1, 2]:         
-            if numCv%2 == 0:
-                halfLen = (numCv-2)/2 
+            if nucmdsv%2 == 0:
+                halfLen = (nucmdsv-2)/2 
                 centerCV =[]
                 for cv in crvCvs:
                     pos = cmds.xform( cv, q=1, ws=1, t=1 )
@@ -437,8 +498,8 @@ def symmetrizeLipCrv(direction):
                     cmds.confirmDialog( title='Confirm', message='number of CVs( tx=0 :on center ) of curve should be 2!!!' )      
             
         if periodic == 0:
-            if numCv%2 == 1:
-                halfLen = (numCv-2)/2 
+            if nucmdsv%2 == 1:
+                halfLen = (nucmdsv-2)/2 
                 centerNum = ''
                 for cv in crvCvs:
                     pos = cmds.xform( cv, q=1, ws=1, t=1 )
@@ -497,201 +558,72 @@ def loftFacePart( facePart ):
 
 #select corner verts and direction vert on loop 
 # return up/low ordered vertices for lipEye ('lip' or 'eye')
-# 나중에 개선: 먼저 코너 버텍스들를 선택하고 저장한 후, right corner vert 와 direction vert만 선택해서 실행하면 자연히 lCornerVert,rCornerVert,secndVert가 실수 없이 나온다.   
+# 나중에 개선: 먼저 코너 버텍스들를 선택하고 저장한 후, direction vert만 선택해서 실행하면 자연히 lCornerVert,rCornerVert,secndVert가 실수 없이 나온다.   
+
 def orderedVert_upLo(lipEye):
-
-    orderSel= cmds.selectPref( trackSelectionOrder=True, q=1 )
-    if orderSel ==False:
-        cmds.confirmDialog( title='Confirm', message='turn on "trackSelectionOrder" in Pref!!!' )
-        
-    mySel = cmds.ls(os=1, fl=1)
-    vertSel = []
-    if lipEye == 'eye':
-        #remove any vertices if they are on minus side
-		for v in mySel:
-			vPos = cmds.xform(v, q=1, ws=1, t=1 )
-			if vPos[0]>0:
-				vertSel.append(v)
-		eyeLidGeo = mySel[0].split(".")[0]
-		if not eyeLidGeo == cmds.getAttr("helpPanel_grp.headGeo"):
-			if cmds.attributeQuery("eyelidGeo", node = "lidFactor", exists=1)==False:   
-				cmds.addAttr( "lidFactor", ln ="eyelidGeo", dt = "string"  )
-				cmds.setAttr("lidFactor.eyelidGeo", eyeLidGeo, type= "string" )
-			 
-    elif lipEye == 'lip':
-		if len(mySel) == 2:
-			#mirror selection
-			if cmds.attributeQuery("headGeo", node = "helpPanel_grp", exists=1) ==1:
-				   
-				vtx =cmds.ls( os=1, fl=1 )
-				polyHead = cmds.getAttr("helpPanel_grp.headGeo")
-				shpSel = cmds.listRelatives( polyHead, c=1, typ = "shape" )
-				cpmNode = cmds.createNode("closestPointOnMesh")
-				cmds.connectAttr( shpSel[0] + ".outMesh", cpmNode + ".inMesh" )
-
-				vtxPos = cmds.xform( mySel[0], q=1, t=1, ws=1)
-				cmds.setAttr( cpmNode + ".inPosition", -vtxPos[0], vtxPos[1], vtxPos[2], type = "double3" )
-				vtxInx = cmds.getAttr( cpmNode + ".closestVertexIndex")
-				mrrV = polyHead+".vtx[%s]"%vtxInx
-				mySel.insert(1, mrrV)
-				vertSel = mySel
-
-		elif len(mySel) == 3:
-			vertSel = mySel
-    else:
-        cmds.warning( "select at least 2 vertices ")
-						
-    
-    if len(vertSel) == 3:
-        vertPosDict = {}
-        for vt in vertSel:
-            vertPos = cmds.xform( vt, q =1, ws =1, t=1 )        
-            vertPosDict[vt] = vertPos 
-        
-        xMaxPos = max(vertPosDict[vertSel[0]][0], vertPosDict[vertSel[1]][0], vertPosDict[vertSel[2]][0])
-        for j, x in vertPosDict.items():
-            if x[0] == xMaxPos:
-                lCornerVert = j
-        vertPosDict.pop(lCornerVert)
-        vertSel.remove(lCornerVert)
-
-        yMaxPos = max(vertPosDict[vertSel[0]][1], vertPosDict[vertSel[1]][1] )
-        for i, y in vertPosDict.items():
-            if y[1] == yMaxPos:
-                secndVert = i
-        
-        vertSel.remove(secndVert)
-        
-        rCornerVert = vertSel[0]        
-        cmds.select ( rCornerVert, secndVert, r=1)       
-        # get ordered verts on the edgeLoop
-        ordered = orderedVerts_edgeLoop()
-        
-        # get up/lo verts    
-        for v, y in enumerate(ordered):
-            if y == lCornerVert:
-                endNum = v+1   
-                
-        if lipEye == 'eye':
-            if cmds.attributeQuery("cornerVerts", node = "lidFactor", exists=1)==False:            
-                cmds.addAttr( "lidFactor", ln ="cornerVerts", dt = "stringArray"  )
-                
-            if cmds.attributeQuery("upLidVerts", node = "lidFactor", exists=1)==False:
-                cmds.addAttr( "lidFactor", ln ="upLidVerts", dt = "stringArray"  )
-            
-            if cmds.attributeQuery("loLidVerts", node = "lidFactor", exists=1)==False:            
-                cmds.addAttr( "lidFactor", ln ="loLidVerts", dt = "stringArray"  )
-            
-            upVert = ordered[1:endNum-1]
-            loVert = ordered[endNum:][::-1]
-            cmds.setAttr("lidFactor.cornerVerts", 2, rCornerVert,lCornerVert, type= "stringArray" )
-            cmds.setAttr("lidFactor.upLidVerts", type= "stringArray", *([len(upVert)] + upVert) )
-            cmds.setAttr("lidFactor.loLidVerts", type= "stringArray", *([len(loVert)] + loVert) )
-            
-        elif lipEye == 'lip':
-            if cmds.attributeQuery("upLipVerts", node = "lipFactor", exists=1)==False:
-                cmds.addAttr( "lipFactor", ln ="upLipVerts", dt = "stringArray"  )
-            if cmds.attributeQuery("loLipVerts", node = "lipFactor", exists=1)==False:
-                cmds.addAttr( "lipFactor", ln ="loLipVerts", dt = "stringArray"  )
-            upVert = ordered[:endNum]
-            loVert = ordered[endNum-1:][::-1]
-            loVert.append(rCornerVert)
-            cmds.setAttr("lipFactor.upLipVerts", type= "stringArray", *([len(upVert)] + upVert) )
-            cmds.setAttr("lipFactor.loLipVerts", type= "stringArray", *([len(loVert)] + loVert) )
-
-    else:
-        print 'select 3 vertices on edge loop!'
-
-
-# select corner verts and directional verts
-def rnkOrderedVert_upLo(lipEye):
     
     #selection ordrer not matter( extract lVert using xform )
     orderSel= cmds.selectPref( trackSelectionOrder=True, q=1 )
-    if orderSel ==False:
+    if not orderSel:
         cmds.confirmDialog( title='Confirm', message='turn on "trackSelectionOrder" in Pref!!!' )
         
-    mySel = cmds.ls(os=1, fl=1)
-    vertSel = []
-    if lipEye == 'eye':
-        #remove any vertices if they are on minus side
-		for v in mySel:
-			vPos = cmds.xform(v, q=1, ws=1, t=1 )
-			if vPos[0]>0:
-				vertSel.append(v)
-		eyeLidGeo = mySel[0].split(".")[0]
-		if cmds.attributeQuery("eyelidGeo", node = "lidFactor", exists=1)==False:  
-			cmds.addAttr( "lidFactor", ln = "eyelidGeo", dt = "string"  )
-			cmds.setAttr("lidFactor.eyelidGeo", eyeLidGeo, type= "string" ) 
-    else:
-        vertSel = mySel
-        
-    if len(vertSel) == 3:
-        vertPosDict = {}
-        for vt in vertSel:
-            vertPos = cmds.xform( vt, q =1, ws =1, t=1 )        
-            vertPosDict[vt] = vertPos 
-        
-        xMaxPos = max(vertPosDict[vertSel[0]][0], vertPosDict[vertSel[1]][0], vertPosDict[vertSel[2]][0])
-        for j, x in vertPosDict.items():
-            if x[0] == xMaxPos:
-                lCornerVert = j
-        vertPosDict.pop(lCornerVert)
-        vertSel.remove(lCornerVert)
+    vertSel = cmds.ls(os=1, fl=1)
+    if not len(vertSel) == 3:
+        raise RuntimeError( "'select 3 vertices on edge loop!'" )
+    
+    vertPosDict = {}
+    for vt in vertSel:
+        vertPos = cmds.xform( vt, q =1, ws =1, t=1 )        
+        vertPosDict[vt] = vertPos 
+    
+    #returns list[ ("vert1",[x,y,z]), ("vert2",[x,y,z]), ("vert3",[x,y,z])....]
+    vertOrder = sorted(vertPosDict.items(), key = lambda x:x[1][0]) #x[1] = [x,y,x]
+    lCornerVert = vertOrder[-1][0]
+    vertSel.remove(lCornerVert)
 
-        yMaxPos = max(vertPosDict[vertSel[0]][1], vertPosDict[vertSel[1]][1] )
-        for i, y in vertPosDict.items():
-            if y[1] == yMaxPos:
-                secndVert = i
-        
-        vertSel.remove(secndVert)
-        
-        rCornerVert = vertSel[0]        
-        cmds.select ( rCornerVert, secndVert, r=1 )       
-        # get ordered verts on the edgeLoop
-        ordered = orderedVerts_edgeLoop()
-        
-        # get up/lo verts
-        endNum = 0       
-        for v, y in enumerate(ordered):
-            # find the last vertex of the upper lid Vertice 
-            if y == lCornerVert:
-                endNum = v+1
-        if endNum == 0:
-            cmds.warning(" 3 vertices are not on the edge loop")
+    rCornerVert = vertSel[0]
+    secondVert = vertSel[-1]    
+           
+    cmds.select ( rCornerVert, secondVert, r=1 )       
+    # get ordered verts on the edgeLoop
+    ordered = orderedVerts_edgeLoop()
+    
+    # get up/lo verts
+    endNum = 0       
+    for v, y in enumerate(ordered):
+        #find lCornerVert in the upper lid Vertice 
+        if y == lCornerVert:
+            endNum = v
             
-        else:        
-            if lipEye == 'eye':
-                if cmds.attributeQuery("cornerVerts", node = "lidFactor", exists=1)==False:            
-                    cmds.addAttr( "lidFactor", ln ="cornerVerts", dt = "stringArray"  )
-                    
-                if cmds.attributeQuery("upLidVerts", node = "lidFactor", exists=1)==False:
-                    cmds.addAttr( "lidFactor", ln ="upLidVerts", dt = "stringArray"  )
-                
-                if cmds.attributeQuery("loLidVerts", node = "lidFactor", exists=1)==False:            
-                    cmds.addAttr( "lidFactor", ln ="loLidVerts", dt = "stringArray"  )
-                
-                upVert = ordered[0:endNum]
-                loVert = ordered[endNum-1:][::-1]
-                loVert.insert(0, rCornerVert)
-                cmds.setAttr("lidFactor.cornerVerts", 2, rCornerVert,lCornerVert, type= "stringArray" )
-                cmds.setAttr("lidFactor.upLidVerts", type= "stringArray", *([len(upVert)] + upVert) )
-                cmds.setAttr("lidFactor.loLidVerts", type= "stringArray", *([len(loVert)] + loVert) )
-                
-            elif lipEye == 'lip':
-                if cmds.attributeQuery("upLipVerts", node = "lipFactor", exists=1)==False:
-                    cmds.addAttr( "lipFactor", ln ="upLipVerts", dt = "stringArray"  )
-                if cmds.attributeQuery("loLipVerts", node = "lipFactor", exists=1)==False:
-                    cmds.addAttr( "lipFactor", ln ="loLipVerts", dt = "stringArray"  )
-                upVert = ordered[:endNum]
-                loVert = ordered[endNum-1:][::-1]
-                loVert.insert(0, rCornerVert)
-                cmds.setAttr("lipFactor.upLipVerts", type= "stringArray", *([len(upVert)] + upVert) )
-                cmds.setAttr("lipFactor.loLipVerts", type= "stringArray", *([len(loVert)] + loVert) )
+    if endNum ==0:
+        raise RuntimeError(" 3 vertices are not on the edge loop")        
+     
+    upVert = ordered[:endNum+1]
+    loVert = ordered[endNum:][::-1]
+    loVert.append(rCornerVert)
+    
+    if lipEye == 'eye':
+        if not cmds.attributeQuery("cornerVerts", node = "lidFactor", exists=1):
+            cmds.addAttr( "lidFactor", ln ="cornerVerts", dt = "stringArray"  )
+            
+        if not cmds.attributeQuery("upLidVerts", node = "lidFactor", exists=1):
+            cmds.addAttr( "lidFactor", ln ="upLidVerts", dt = "stringArray"  )
+        
+        if not cmds.attributeQuery("loLidVerts", node = "lidFactor", exists=1):
+            cmds.addAttr( "lidFactor", ln ="loLidVerts", dt = "stringArray"  )        
 
-    else:
-        print 'select 3 vertices on edge loop!'
+        cmds.setAttr("lidFactor.cornerVerts", 2, rCornerVert,lCornerVert, type= "stringArray" )
+        cmds.setAttr("lidFactor.upLidVerts", type= "stringArray", *([len(upVert)] + upVert) )
+        cmds.setAttr("lidFactor.loLidVerts", type= "stringArray", *([len(loVert)] + loVert) )
+        
+    elif lipEye == 'lip':
+        if not cmds.attributeQuery("upLipVerts", node = "lipFactor", exists=1):
+            cmds.addAttr( "lipFactor", ln ="upLipVerts", dt = "stringArray"  )
+        if not cmds.attributeQuery("loLipVerts", node = "lipFactor", exists=1):
+            cmds.addAttr( "lipFactor", ln ="loLipVerts", dt = "stringArray"  )
 
+        cmds.setAttr("lipFactor.upLipVerts", type= "stringArray", *([len(upVert)] + upVert) )
+        cmds.setAttr("lipFactor.loLipVerts", type= "stringArray", *([len(loVert)] + loVert) )
 
 
 #LidLip = "eye" or "lip"
@@ -799,7 +731,7 @@ def browJoints():
     for x in orderedVerts:
         vertPos = cmds.xform(x, t = True, q = True, ws = True)
         
-        if ( math.pow(vertPos[0], 2 ) <= 0.01):
+        if math.pow(vertPos[0], 2 ) <= 0.01:
             
             baseCntJnt = cmds.joint(n = 'c_browBase'+ str(index).zfill(2)+'_jnt', p = [ 0, browRotXPos[1], browRotXPos[2]])
             downCntJnt = cmds.joint(n = 'c_browDown'+ str(index).zfill(2)+'_jnt', p = [ 0, browRotXPos[1], browRotXPos[2]])
@@ -834,11 +766,9 @@ def browJoints():
             cmds.setAttr(mirrBase[3]+ '.rx', 180 )
             cmds.parent( mirrBase[0], rBrowGrp )
             cmds.select(cl = True)
-            index = index + 1 
-
-            
+            index = index + 1
    
-            
+
 def setBrowLabel(jnt):
     label = jnt.split("_")[1]
     if "c_" == jnt[:2]:
@@ -856,7 +786,6 @@ def setBrowLabel(jnt):
 def attachCrvs( crvSel ):
 
     cmds.attachCurve( crvSel, ch=1, replaceOriginal=0, keepMultipleKnots =0, method=1, blendBias=0.5, blendKnotInsertion=0, parameter=0.1 ) 
-
 
 
 
@@ -921,9 +850,9 @@ def connectBrowCtrls ( numOfCtl, size, offset, crv, browCtl ):
     strs = string.ascii_uppercase
     lf=[]
     rt=[]
-    for i in range(1, centerNum):
-        rName= "R"+ strs[centerNum-i]
-        lName= "L"+ strs[i]
+    for index in range(1, centerNum):
+        rName= "R"+ strs[centerNum-index]
+        lName= "L"+ strs[index]
         rt.append(rName)
         lf.append(lName)    
     sequence = rt+["A"]+lf
@@ -977,7 +906,7 @@ def connectBrowCtrls ( numOfCtl, size, offset, crv, browCtl ):
                    
     increment = 1.0/(jntNum-1)
     index = 0 
-    for i, jnt in enumerate(orderJnts):
+    for index, jnt in enumerate(orderJnts):
         basePos = cmds.xform( jnt, t = True, q = True, ws = True)
         print jnt
         browJntList = cmds.listRelatives ( jnt, c=True, ad =1 )
@@ -1017,7 +946,7 @@ def connectBrowCtrls ( numOfCtl, size, offset, crv, browCtl ):
             for att in attrs:            
                 cmds.setAttr ( rBrowCtrl[0] + ".%s"%att, lock =1, keyable = 0)
             
-            cmds.connectAttr(dtailPoc[i]+".position", zeroGrp[0] + ".t" )                        
+            cmds.connectAttr(dtailPoc[index]+".position", zeroGrp[0] + ".t" )                        
             browCrvCtlToJnt( rBrowCtrl[0], jnt, browJntList,  shapePOC, POC, index )
         
         elif jnt in y : #left joints
@@ -1034,7 +963,7 @@ def connectBrowCtrls ( numOfCtl, size, offset, crv, browCtl ):
             for att in attrs:            
                 cmds.setAttr ( lBrowCtrl[0] + ".%s"%att, lock =1, keyable = 0)
             
-            cmds.connectAttr(dtailPoc[i]+".position", zeroGrp[0] + ".t" )
+            cmds.connectAttr(dtailPoc[index]+".position", zeroGrp[0] + ".t" )
             browCrvCtlToJnt (lBrowCtrl[0], jnt, browJntList,  shapePOC, POC, index  )
             
         elif jnt == z[0]:
@@ -1051,7 +980,7 @@ def connectBrowCtrls ( numOfCtl, size, offset, crv, browCtl ):
             for att in attrs:            
                 cmds.setAttr ( centerBrowCtrl[0] + ".%s"%att, lock =1, keyable = 0 )
             
-            cmds.connectAttr(dtailPoc[i]+".position", zeroGrp[0] + ".t" )    
+            cmds.connectAttr(dtailPoc[index]+".position", zeroGrp[0] + ".t" )    
             browCrvCtlToJnt ( centerBrowCtrl[0], jnt, browJntList, shapePOC, POC, index )
             
         index = index + 1'''
@@ -1121,7 +1050,7 @@ def connectBrowCtrls ( numOfCtl, size, offset, crv ):
     tempCtlCrv = cmds.curve ( d = 1, p =([-1,0,0],[-0.5,0,0],[0,0,0],[0.5,0,0],[1,0,0]) )
     browCtlCrv = cmds.rename (tempCtlCrv, 'browCtrlCrv' ) 
     cmds.rebuildCurve (browCtlCrv, rebuildType = 0, spans = numOfCtl-1, keepRange = 0, degree = 3 ) 
-    browCtlCrvShape = cmds.listRelatives ( browCtlCrv, c = True ) 
+    browCtlCrvShape = cmds.listRelatives ( browCtlCrv, c = True )
     cmds.parent ( browCtlCrv, "browCrv_grp") 
     
     #connect browMain Ctrls to browCtlCrv
@@ -1373,7 +1302,6 @@ def browCrvCtlToJnt( browCtrl, jnt, browJntList, ctlBase, rotYCtl, shapePOC, POC
         cmds.setAttr( conversion + ".conversionFactor", -1 )
         cmds.connectAttr(browXYZSum + '.output3Dz', conversion + '.input' )
         cmds.connectAttr(conversion + '.output', browDwnJnt + '.tz' )
-
   
     #browCtrl --> browJnt[0] + ".translate"
     #cmds.connectAttr(browXYZSum + '.output3Dz', browDwnJnt + '.tz' )
@@ -1384,56 +1312,53 @@ def browCrvCtlToJnt( browCtrl, jnt, browJntList, ctlBase, rotYCtl, shapePOC, POC
     cmds.connectAttr(browCtrl + '.s', browJnt + '.s')
 
  
-
-#select "ctl guide curve", "ctl sample"(both or either or none) 
+#select "ctl guide curve", "ctl sample"(both or either or none)
 def browCtl_onHead( numOfCtl, offset, radius, polyEdgeCrv, myCtl ):
-    
-    if polyEdgeCrv:        
-        cmds.rename( polyEdgeCrv, "brow_guide_Crv" )
-        crv = "brow_guide_Crv"
 
-    else:    
-        headMesh = cmds.getAttr("helpPanel_grp.headGeo") 
+    browVerts = cmds.getAttr("browFactor.browVerts")
+    length = len(browVerts)
+    edges = []
+    for i in range(length - 1):
+        cmds.select(browVerts[i], browVerts[i + 1], r=1)
+        mel.eval('ConvertSelectionToContainedEdges')
+        cmds.ls(sl=1, fl=1)
+        edge = cmds.filterExpand(ex=True, sm=32)
+        if edge:
+            edges.append(edge[0])
+
+    if len(edges) == length - 1:
+
         browVerts = cmds.getAttr( "browFactor.browVerts" )
-        orderedVerts=[]
         mirrorVerts = mirrorVertice( browVerts )
         orderedVerts = mirrorVerts[1:][::-1] + browVerts
+        crv = face_utils.Util.createPolyToCurve( orderedVerts, facepart ="brow")
+        cmds.rebuildCurve( crv, rebuildType = 0, spans = numOfCtl-1, keepRange = 0, degree = 1, ch=1 )
+        crvShape = cmds.listRelatives( crv, c=1 )[0]
 
-        #create guide curve based on lipFactor vtx
-        edges =[]
-        numVtx = len(orderedVerts)
-        for v in range(numVtx-1):
-            
-            cmds.select( orderedVerts[v] )
-            x = cmds.polyListComponentConversion( fv=1, toEdge=1 )
-            cmds.select(x, r=1 )
-            edgeA= cmds.ls(sl=1, fl=1)
-            cmds.select(orderedVerts[v+1], r=1 )
-            y =cmds.polyListComponentConversion( fv=1, toEdge=1 )
-            cmds.select(y, r=1 )
-            edgeB= cmds.ls(sl=1, fl=1)
-            
-            common = set(edgeA) -(set(edgeA) - set(edgeB))
-            if common:
-                edges.append(list(common)[0])
-            else:
-                cmds.confirmDialog( title='Confirm', message='Select "polyEdgeCurve" for brow Ctrls!!' )
-                break
-                
-        cmds.select(cl=1)
-        
-        for e in edges:
-            cmds.select(e, add=1)
-            
-        crv = cmds.polyToCurve( form=2, degree=1, n = "brow_guide_Crv")[0]
+    else:
+        print
+        "direct control"
+
+    edgeLoop=[]
+    for index, vtx in enumerate(browVerts):
+        cmds.select(vtx[index], vtx[index+1], r=1)
+        mel.eval('ConvertSelectionToContainedEdges')
+        cmds.ls(sl=1, fl=1)
+        edge = cmds.filterExpand(ex=True, sm=32)
+        if edge:
+            edgeLoop.append(edge)
+
+    if len(edgeLoop) == len(browVerts)-1:
+        browVerts = cmds.getAttr( "browFactor.browVerts" )
+        mirrorVerts = mirrorVertice( browVerts )
+        orderedVerts = mirrorVerts[1:][::-1] + browVerts
+        crv = face_utils.Util.createPolyToCurve( orderedVerts, facepart ="brow")
+        cmds.rebuildCurve( crv, rebuildType = 0, spans = numOfCtl-1, keepRange = 0, degree = 1, ch=1 )
+        crvShape = cmds.listRelatives( crv, c=1 )[0]
     
-    print crv
-    cmds.rebuildCurve( crv, rebuildType = 0, spans = numOfCtl-1, keepRange = 0, degree = 1, ch=1 )    
-    crvShape = cmds.listRelatives( crv, c=1 )[0]
-    
-    if not cmds.objExists('guideCrv_grp'):
-        guideCrvGrp = cmds.group ( n = 'guideCrv_grp', em =True, p = 'faceMain|crv_grp' )
-        cmds.parent( crv, guideCrvGrp )
+        if not cmds.objExists('guideCrv_grp'):
+            guideCrvGrp = cmds.group ( n = 'guideCrv_grp', em =True, p = 'faceMain|crv_grp' )
+        cmds.parent( crv, "guideCrv_grp" )
    
     if cmds.nodeType(crvShape)=="nurbsCurve":
     
@@ -1447,18 +1372,18 @@ def browCtl_onHead( numOfCtl, offset, radius, polyEdgeCrv, myCtl ):
         #create group node for brow Ctls    
         if not cmds.objExists( "browCtl_grp" ):
             browCtlGrp = cmds.group ( n = "browCtl_grp", em =True, p = "ctl_grp" )
-        else:
-            browCtlGrp = "browCtl_grp"
+
+        browCtlGrp = "browCtl_grp"
         
         pocs = pocEvenOnCrv( crv, numOfCtl, "brow_arc" )#create brow_arc01_poc, brow_arc02_poc...
-        leng = (len(pocs)+1)
+        length = (len(pocs)+1)
         sequence = string.ascii_uppercase
         ctlColor = [ 2, 12, 6 ] #,23,22,21,20,19,18,17,16,14,13 red ,12,9,7,6,4,1 ]
         
         #create main ctls
-        for i in range(leng/2):
+        for i in range(length/2):
         
-            center = leng/2-1                 
+            center = length/2-1
             if i == 0:
                 #sequence = A, color = 2, pos = pocs[center]
                 null = cmds.group( em=1, n = "brow_arcMid_null" ) #create brow_arcA_null,brow_arcB_null..
@@ -1467,7 +1392,7 @@ def browCtl_onHead( numOfCtl, offset, radius, polyEdgeCrv, myCtl ):
                 if myCtl:
                     newCtl = cmds.duplicate( myCtl )[0]  
                     #이름 수정, CtlP null에 페어런트하고 position에 옮겨놓는다.
-                    ctl = customCtl(  newCtl, null.replace( "Mid_null", "Mid" ), pos )
+                    ctl = customCtls(newCtl, null.replace("Mid_null", "Mid"), pos)
 
                 else:
                     ctl = arcController( null.replace( "Mid_null", "Mid"), pos, radius*2, "cc" )
@@ -1481,7 +1406,7 @@ def browCtl_onHead( numOfCtl, offset, radius, polyEdgeCrv, myCtl ):
                 cmds.parent( null, browCtlGrp )
                 
             else:
-                #sequence = [i], color = (i+1)*2, pos = pocs[center-i], pocs[center+ i]
+                #sequence = [index], color = (index+1)*2, pos = pocs[center-index], pocs[center+ index]
                 LR = { "L":center+i, "R": center-i }
                 num = 0
                 for k, x in LR.items():
@@ -1491,7 +1416,7 @@ def browCtl_onHead( numOfCtl, offset, radius, polyEdgeCrv, myCtl ):
                     if myCtl:
                         newCtl = cmds.duplicate( myCtl )[0]  
                         #이름 수정, CtlP null에 페어런트하고 position에 옮겨놓는다.
-                        ctl = customCtl(  newCtl, null.replace( sequence[i-1]+"_null", sequence[i-1] ), pos )
+                        ctl = customCtls(newCtl, null.replace(sequence[i - 1] + "_null", sequence[i - 1]), pos)
                         cmds.setAttr (ctl[0] +"Shape.overrideEnabled", 1 )
                         cmds.setAttr( ctl[0]+"Shape.overrideColor", ctlColor[num+1] )
 
@@ -1706,8 +1631,8 @@ def eyelidJoints_old( upLowLR ):
 
         rBlink = cmds.listRelatives( rLidJnt[0], c=1 )[0]
         print rBlink
-        cmds.aimConstraint( loc, blinkJnt, mo =1, weight=1, aimVector = (0,0,1), upVector = (0,1,0), worldUpType="object", worldUpObject = "l_eyeUp_loc" )
-        cmds.aimConstraint( rLoc, rBlink, mo =1, weight=1, aimVector = (0,0,1), upVector = (0,1,0), worldUpType="object", worldUpObject = "r_eyeUp_loc" )                                       
+        cmds.aicmdsonstraint( loc, blinkJnt, mo =1, weight=1, aimVector = (0,0,1), upVector = (0,1,0), worldUpType="object", worldUpObject = "l_eyeUp_loc" )
+        cmds.aicmdsonstraint( rLoc, rBlink, mo =1, weight=1, aimVector = (0,0,1), upVector = (0,1,0), worldUpType="object", worldUpObject = "r_eyeUp_loc" )                                       
         
         index = index + 1
         
@@ -1734,7 +1659,7 @@ def eyelidJoints( upLowLR ):
 
     ordered = []
     if "up" in upLowLR:
-        if cmds.attributeQuery("upLidVerts", node = lidFactor, exists=1)==True:
+        if cmds.attributeQuery("upLidVerts", node = lidFactor, exists=1):
             ordered = cmds.getAttr( lidFactor + ".upLidVerts")
         else:
             cmds.confirmDialog( title='Confirm', message= "store lid vertices in order first!!")    	
@@ -1808,8 +1733,8 @@ def eyelidJoints( upLowLR ):
         rLoc = mirrorLR + 'Loc'+str(i+1).zfill(2)
         lBlink = upLowLR + 'LidBlink'+str(i+1).zfill(2)+ '_jnt'
         rBlink = mirrorLR + 'LidBlink'+str(i+1).zfill(2)+ '_jnt'
-        cmds.aimConstraint( lLoc, lBlink, mo =1, weight=1, aimVector = (0,0,1), upVector = (0,1,0), worldUpType="object", worldUpObject = "l_eyeUp_loc" )
-        cmds.aimConstraint( rLoc, rBlink, mo =1, weight=1, aimVector = (0,0,1), upVector = (0,1,0), worldUpType="object", worldUpObject = "r_eyeUp_loc" )                                       
+        cmds.aicmdsonstraint( lLoc, lBlink, mo =1, weight=1, aimVector = (0,0,1), upVector = (0,1,0), worldUpType="object", worldUpObject = "l_eyeUp_loc" )
+        cmds.aicmdsonstraint( rLoc, rBlink, mo =1, weight=1, aimVector = (0,0,1), upVector = (0,1,0), worldUpType="object", worldUpObject = "r_eyeUp_loc" )                                       
       
 
 
@@ -1894,7 +1819,7 @@ def eyeHiCrv( prefix ):
             posOrder.append(rPos)        
    
     tmpCrv = cmds.curve( d= 1, p= posOrder )#, n =  prefix  + "TempCrv01"
-    #int $numCVs   = $numSpans + $degree
+    #int $nucmdsVs   = $numSpans + $degree
     #cmds.rebuildCurve( tmpCrv, d = 1, rebuildType = 0, s= leng-1, keepRange = 0)
     newHiCrv = cmds.rename( tmpCrv, prefix  + "HiCrv01" )
     cmds.parent( newHiCrv, eyeCrvGrp )
@@ -1930,7 +1855,7 @@ def eyeHiCrv( prefix ):
 
 #create "attachCtl_grp" in hierachy
 # adjust CTLcrv(master) shape to hiCrv
-# place joints for eyeCtls at 20*i% on hi curve
+# place joints for eyeCtls at 20*index% on hi curve
 def eyeCtrls( prefix, numEyeCtl, offset ):
    
     headMesh = cmds.getAttr( "helpPanel_grp.headGeo")
@@ -2043,7 +1968,7 @@ def eyeCtrls( prefix, numEyeCtl, offset ):
         cmds.setAttr( ctl[1] + ".tz", offset )
         cmds.parent( ctlGrp , "eyeOnCtl_grp" )
                     
-        #print "%s is for %s"%(str(i), ctl)
+        #print "%s is for %s"%(str(index), ctl)
         
         cmds.connectAttr( ctl[0] + ".t" , jnt + ".t" )
         cmds.connectAttr( ctl[0] + ".r" , jnt + ".r" )
@@ -2258,7 +2183,7 @@ def eyeRigAttachBody( eyeGeoGrp, upVector):
 
 
 #RNK Jaw Setup
-def mouthJoint( upLow, numCtls ): 
+def mouthJoint( upLow, numOfCtl):
     
     lipEPos = cmds.xform( 'lipEPos', t = True, q = True, ws = True )
     lipWPos = [-lipEPos[0], lipEPos[1], lipEPos[2]] 
@@ -2268,24 +2193,21 @@ def mouthJoint( upLow, numCtls ):
     jawRigPos = cmds.xform( 'jawRigPos', t = True, q = True, ws = True ) 
     
     if not cmds.objExists( upLow + 'Lip_grp' ):
-    	lipJntGrp = cmds.group(n = upLow + 'Lip_grp', em =True, p = 'lipJotP')    	
+        lipJntGrp = cmds.group(n = upLow + 'Lip_grp', em =True, p = 'lipJotP')
     else:
-    	lipJntGrp = upLow + 'Lip_grp'
+        lipJntGrp = upLow + 'Lip_grp'
     cmds.xform( lipJntGrp, ws = 1, t = jawRigPos)
     
-    if cmds.attributeQuery( upLow + "LipVerts", node = "lipFactor", exists=1)==True:
-    	orderedVerts = cmds.getAttr( "lipFactor." + upLow + "LipVerts" )            
-    else:
-    	cmds.warning("store lip vertices in order first!!")    
-    
+    if not cmds.attributeQuery( upLow + "LipVerts", node = "lipFactor", exists=1):
+        raise RuntimeError("store lip vertices in order first!!")
+
+    orderedVerts = cmds.getAttr( "lipFactor." + upLow + "LipVerts" )
     vNum = len( orderedVerts )
     if upLow == "up":
-    	lipCntPos = lipNPos            
+        lipCntPos = lipNPos
     elif upLow == "lo":
-    	lipCntPos = lipSPos
-		#jmax = 1
-		#jmax = vNum+1 :: it wont work because the curve length should be from 0 to 1
-		
+        lipCntPos = lipSPos
+
     #create blendShape curves for lip ( jawOpen/ happy / sad....)
     tempCrv = cmds.curve(d= 3, ep= [lipWPos, lipCntPos,lipEPos] ) 
     guideCrv = cmds.rename(tempCrv, upLow + "_guide_crv" )
@@ -2294,7 +2216,7 @@ def mouthJoint( upLow, numCtls ):
     
     # create extra curves ( jaw drop / free form ) 
     tempflatCrv  = cmds.curve(d = 3, p =([0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0])) 
-    cmds.rebuildCurve(rt = 0, d = 3, kr = 0, s = numCtls-1 )
+    cmds.rebuildCurve(rt = 0, d = 3, kr = 0, s = numOfCtl-1 )
     #cmds.rebuildCurve (browCtlCrv, rebuildType = 0, spans = numOfCtl-1, keepRange = 0, degree = 3 )         
     bsCrv   = cmds.rename( tempflatCrv, upLow + '_lipBS_crv')     
     bsCrvShape  = cmds.listRelatives( bsCrv, c = True )    
@@ -2316,22 +2238,22 @@ def mouthJoint( upLow, numCtls ):
     lipPuffCrvShape = cmds.listRelatives( lipPuffCrv, c = True )
     
     '''tempPffCrv = cmds.curve(d = 3, p =([0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0])) 
-    tmplipPuffCrv = cmds.rebuildCurve(tempPffCrv, rt = 0, d = 3, kr = 0, s = numCtls-1 )
+    tmplipPuffCrv = cmds.rebuildCurve(tempPffCrv, rt = 0, d = 3, kr = 0, s = numOfCtl-1 )
     lipPuffCrv = cmds.rename( tmplipPuffCrv[0], upLow +'_lipScale_crv' )'''
     
-    linearDist = 1.0/(vNum-1)
+    param = 1.0/(vNum-1)
     lipJnts = [] 
     dropPocs=[]
     rollPocs =[]
     puffPocs = []
     cvPos = []
-    increment = 0.0    
+  
     for i in range( vNum ):
     
         guidePoc =cmds.shadingNode ( 'pointOnCurveInfo', asUtility=True, n = upLow +'_lipGuide' + str(i).zfill(2) + '_poc' )
         cmds.connectAttr( guideCrvShape[0] + ".worldSpace" , guidePoc + ".inputCurve" )
         cmds.setAttr( guidePoc + ".turnOnPercentage", 1 )
-        cmds.setAttr( guidePoc +".parameter", increment )
+        cmds.setAttr( guidePoc +".parameter", param*i )
         pocPos = cmds.getAttr( guidePoc + ".position")[0]
         
         lipJot = createLipJoint( upLow, jawRigPos, lipYPos, pocPos, lipJntGrp, i )
@@ -2341,7 +2263,7 @@ def mouthJoint( upLow, numCtls ):
         jawDropPoc =cmds.shadingNode ( 'pointOnCurveInfo', asUtility=True, n = upLow +'_jawDrop' + str(i).zfill(2) + '_poc' )
         cmds.connectAttr( jawDropCrvShape[0] + ".worldSpace" , jawDropPoc + ".inputCurve" )
         cmds.setAttr( jawDropPoc + ".turnOnPercentage", 1 )
-        cmds.setAttr( jawDropPoc +".parameter", increment )
+        cmds.setAttr( jawDropPoc +".parameter", param*i )
         dropPocs.append(jawDropPoc)
         #get position list for hi curve
         pocPos = cmds.getAttr(jawDropPoc + ".position")[0]        
@@ -2351,18 +2273,16 @@ def mouthJoint( upLow, numCtls ):
         lipRollPoc =cmds.shadingNode ( 'pointOnCurveInfo', asUtility=True, n = upLow +'_lipRoll' + str(i).zfill(2) + '_poc' )
         cmds.connectAttr( lipRollCrvShape[0] + ".worldSpace" , lipRollPoc + ".inputCurve" )
         cmds.setAttr( lipRollPoc + ".turnOnPercentage", 1 )
-        cmds.setAttr( lipRollPoc +".parameter", increment )  
+        cmds.setAttr( lipRollPoc +".parameter", param*i )  
         rollPocs.append(lipRollPoc)
 		
         #lipPuffCrv pointOnCurve
         lipPuffPoc =cmds.shadingNode ( 'pointOnCurveInfo', asUtility=True, n = upLow +'_lipPuff' + str(i).zfill(2) + '_poc' )
         cmds.connectAttr( lipPuffCrvShape[0] + ".worldSpace" , lipPuffPoc + ".inputCurve" )
         cmds.setAttr( lipPuffPoc + ".turnOnPercentage", 1 )
-        cmds.setAttr( lipPuffPoc +".parameter", increment ) 
-        puffPocs.append(lipPuffPoc)
-        
-        increment = increment + linearDist
-				
+        cmds.setAttr( lipPuffPoc +".parameter", param*i ) 
+        puffPocs.append(lipPuffPoc)        
+			
     bsHiCrv = cmds.curve( d= 1, ep= cvPos )
     newBSHiCrv = cmds.rename( bsHiCrv, upLow  + "_lipBsHiCrv" )
     bsHiCrvShape = cmds.listRelatives( newBSHiCrv, c=1, ni=1, s=1 )
@@ -2385,8 +2305,7 @@ def mouthJoint( upLow, numCtls ):
         cmds.connectAttr( bsHiCrvShape[0] + ".worldSpace" , bsHiPoc + ".inputCurve", f=1 )
         cmds.setAttr(bsHiPoc + ".parameter", uParam )
         bsPocs.append(bsHiPoc)
-        print uParam, v 
-        
+
         jawOpenPoc =cmds.shadingNode ( 'pointOnCurveInfo', asUtility=True, n = upLow +'_jawOpen' + str(v).zfill(2) + '_poc' )
         cmds.connectAttr( jawOpenHiCrvShape[0] + ".worldSpace" , jawOpenPoc + ".inputCurve" )        
         cmds.setAttr( jawOpenPoc +".parameter", uParam )       
@@ -2432,20 +2351,19 @@ def setLipJntLabel():
         
 import math
 def distance(inputA=[1,1,1], inputB=[2,2,2]):
-    return math.sqrt(pow(inputB[0]-inputA[0], 2) + pow(inputB[1]-inputA[1], 2) + pow(inputB[2]-inputA[2], 2))    
- 
+    return math.sqrt(pow(inputB[0]-inputA[0], 2) + pow(inputB[1]-inputA[1], 2) + pow(inputB[2]-inputA[2], 2))
 
 
 def createLipJoint( upLow, jawRigPos, lipYPos, pocPos, lipJntGrp, i):
     
     # create lip joints parent group
-    lipJotX  = cmds.group( n = upLow + 'LipJotX' + str(i).zfill(2), em =True, parent = lipJntGrp ) 
+    lipJotX  = cmds.group( n = upLow + 'LipJotX' + str(i).zfill(2), em =True, parent = lipJntGrp )
+    cmds.xform(lipJotX, ws=1, t=[0, jawRigPos[1], jawRigPos[2]])
     lipJotY  = cmds.group( n = upLow +'LipJotY' + str(i).zfill(2), em =True, parent = lipJotX )
     cmds.xform( lipJotY, ws=1, t = [ 0, lipYPos[1], lipYPos[2]] )     
     lipYJnt  = cmds.joint( n = upLow +'LipY' + str(i).zfill(2) + "_jnt", relative = True, p = [ 0, 0, 0] )
     lipRollT = cmds.group( n = upLow +'LipRollT' + str(i).zfill(2), em =True, parent = lipYJnt )
-    #cmds.setAttr ( lipJotY + ".tz", lipYPos[2] )
-     
+
     #lip joint placement on the curve with verts tx        
     lipRollP = cmds.group( n =upLow + 'LipRollP' + str(i).zfill(2), em =True, p = lipRollT ) 
     cmds.xform ( lipRollP, ws = True, t = pocPos ) 
@@ -2497,7 +2415,7 @@ def mouthCrvToJoint( upLow ):
 		iniX = cmds.getAttr ( jawDropPoc + '.positionX' )
 
 		lipRollPoc = lipRollPocList[i]
-		#lipPuffPoc = lipPuffPocList[i]
+		#lipPuffPoc = lipPuffPocList[index]
 
 		#JotX rotationXY connection
 		#ty(input3Dy) / extra ty(input3Dx) seperate out for jawSemi
@@ -2552,11 +2470,11 @@ def mouthCrvToJoint( upLow ):
 		'''cmds.setAttr ( lipRollTran_plus + '.operation', 1 ) 
 		cmds.connectAttr ( lipPuffPoc + '.positionX', lipRollTran_plus + '.input3D[0].input3Dx') 
 		cmds.setAttr (lipRollTran_plus + '.input3D[1].input3Dx', -iniX )
-		cmds.connectAttr ( lipRollTran_plus + '.output3Dx',  rollJnts[i] + '.tx')
+		cmds.connectAttr ( lipRollTran_plus + '.output3Dx',  rollJnts[index] + '.tx')
 
 		cmds.setAttr ( jotXTran_plus + '.operation', 1 ) 
 		cmds.connectAttr ( lipPuffPoc + '.positionY', lipRollTran_plus + '.input3D[0].input3Dy') 
-		cmds.connectAttr ( lipRollTran_plus + '.output3Dy',  rollJnts[i] + '.ty')'''
+		cmds.connectAttr ( lipRollTran_plus + '.output3Dy',  rollJnts[index] + '.ty')'''
 
 		cmds.setAttr ( jotXTran_plus + '.operation', 1 ) 
 		#cmds.connectAttr ( lipPuffPoc + '.positionZ', lipRollTran_plus + '.input1D[0]' )
@@ -2568,9 +2486,9 @@ def mouthCrvToJoint( upLow ):
    
 
 # create "lipBS_grp" / crv blendShape
-def lipCtlSetup( upLow, numCtls ):
+def lipCtlSetup( upLow, nucmdstls ):
 
-    bsCrv = upLow + "_lipBS_crv"  
+    bsCrv = upLow + "_lipBS_crv"
     jawOpenCrv = upLow + "_jawOpen_crv"
     jawDropCrv = upLow + "_jawDrop_crv"
     #lipRollCrv = upLow + "_lipRoll_crv"
@@ -2624,7 +2542,7 @@ def lipCtlSetup( upLow, numCtls ):
     cmds.blendShape(lipCrvBS[0], edit=True, w=[(0, 1),(1, 1),(2, 1),(3, 1),(4, 1),(5, 1),(6, 1),(7, 1),(8, 1),(9, 1),(10, 1),(11, 1)])
     
     #upLow + '_lipBS_crv' / upLow +'_jawOpen_crv'
-    jnts = lipCtrlJntForCrv( upLow, bsCrv, "lip", numCtls )
+    jnts = lipCtrlJntForCrv( upLow, bsCrv, "lip", nucmdstls )
     if upLow == "lo":
     	jntP = cmds.listRelatives( jnts, p = 1 )
     	cmds.delete( jntP[0], jntP[-1])
@@ -2664,33 +2582,30 @@ def mirrorCurve( lCrv, rCrv):
         cmds.connectAttr( lCrvCv[i] + '.yValue', rCrvCv[cvLeng-i-1] + '.yValue' )
         cmds.connectAttr( lCrvCv[i] + '.zValue', rCrvCv[cvLeng-i-1] + '.zValue' )
 
-
      
 
 
 #joint ctrl evenly on the curve 
-def lipCtrlJntForCrv(upLow, crv, name, numCtls ):
+def lipCtrlJntForCrv(upLow, crv, name, numOfCtl ):
 
-    center = (numCtls-1)/2    
-    increm = 1.0 / (numCtls-1)
-    sequence =symmetryLetter(numCtls)         
+    increm = 1.0 / (numOfCtl-1)
+    sequence =mirrorOrder_name(numOfCtl)
     ctlJnts = []
-    vertPos = []
     if not cmds.objExists( name+"_jntGrp" ):
         lipJntGrp = cmds.group ( n = name+"_jntGrp", em =True, p = 'faceMain|jnt_grp' )
     else:
         lipJntGrp = name+"_jntGrp"
     
     title = upLow +"_"+ name
-    pocs = pocEvenOnCrv( crv, numCtls, title )
-    print pocs
-    for i in range( numCtls ):
+    pocs = pocEvenOnCrv( crv, numOfCtl, title )
+
+    for i in range( numOfCtl ):
     
         pos = cmds.getAttr( pocs[i] + ".position")[0]
         #create ctl joints grp
         if i == 0 :
             null = cmds.group( em=1, n = "rCorner_" + name + "_jntP", p = lipJntGrp  )
-        elif i == numCtls-1 :
+        elif i == numOfCtl-1 :
             null = cmds.group( em=1, n = "lCorner_" + name + "_jntP", p = lipJntGrp )
 
         else:
@@ -2705,45 +2620,13 @@ def lipCtrlJntForCrv(upLow, crv, name, numCtls ):
 
 
 
-
-'''
-def indieCrvSetup():
-    #skin lip Curves 
-    crvDict = { "lipBS_crv": "lip_jntGrp",  "lipPuff_crv": "lip_jntGrp", "jawDrop_crv":"jawDrop_jntGrp", "jawOpen_crv":"jawOpen_jntGrp" }
-    for crv, grp in crvDict.items():
-        
-        ctlJnts=lastJntOfChain( grp )
-        cornerJnt = [ x for x in ctlJnts if "Corner" in x ]
-
-        if "jaw" in crv:
-        	
-			upMidJnt = [ y for y in ctlJnts if "up" in y ][0]
-			loMidJnt = [ z for z in ctlJnts if "lo" in z ][0]
-			cmds.expression( s= '%s.tx = %s.tx*0.5 - %s.ty*0.060'%(cornerJnt[0], loMidJnt, loMidJnt) )                             
-			cmds.expression( s= '%s.tx = %s.tx*0.5 + %s.ty*0.060'%(cornerJnt[1], loMidJnt, loMidJnt ) )  
-			cmds.expression( s= '%s.ty = %s.ty*0.5'%(cornerJnt[0], loMidJnt ) )
-			cmds.expression( s= '%s.tz = %s.tz*0.5'%(cornerJnt[0], loMidJnt ) )  
-			cmds.expression( s= '%s.ty = %s.ty*0.5'%(cornerJnt[1], loMidJnt ) )
-			cmds.expression( s= '%s.tz = %s.tz*0.6'%(cornerJnt[1], loMidJnt ) ) 
-			cmds.expression( s= '%s.tx = %s.tx*0.1'%(upMidJnt, loMidJnt ) ) 
-			cmds.expression( s= '%s.ty = %s.ty*0.01'%(upMidJnt, loMidJnt) )
-			cmds.expression( s= '%s.tz = %s.tz*0.01'%(upMidJnt, loMidJnt) )
-            
-        for upLow in ["up","lo"]:            
-            
-            ctlJot = [ j for j in ctlJnts if upLow in j ]    
-            cmds.skinCluster( upLow+"_"+crv, ctlJot+cornerJnt, bm=0, nw=1, weightDistribution=0, mi=3, omi=True, tsb=1 )   
-'''
-
-
-        
 def indieCrvSetup():
 
     #skin lip Curves 
-    crvDict = { "lipBS_crv": "lip_jntGrp", "jawDrop_crv":"jawDrop_jntGrp", "jawOpen_crv":"jawOpen_jntGrp" }
+    crvDict = { "lipBS_crv": "lip_jntGrp" }
     for crv, grp in crvDict.items():
     
-        ctlJnts=lastJntOfChain( grp )
+        ctlJnts=lastJntOfChain( "lip_jntGrp" )
         cornerJnt = [ x for x in ctlJnts if "Corner" in x ]
         for upLow in ["up","lo"]:            
             
@@ -2765,19 +2648,18 @@ def indieCrvSetup():
             loMidJnt = [ z for z in ctlJnts if "lo" in z ][0]
                             
             #set up cornerJoint.translate damping on midJoint.translate
-            if cmds.attributeQuery( "cornerTx", node = ctl, exists=1)==False:
+            if not cmds.attributeQuery( "cornerTx", node = ctl, exists=1):
                 cmds.addAttr( ctl, ln ="cornerTx", attributeType='float', dv = .5 )
                 cmds.setAttr( ctl + ".cornerTx", e =1, keyable=1 )
             
-            if cmds.attributeQuery( "cornerTy", node = ctl, exists=1)==False:
+            if not cmds.attributeQuery( "cornerTy", node = ctl, exists=1):
                 cmds.addAttr( ctl, ln ="cornerTy", attributeType='float', dv = .5 )
                 cmds.setAttr( ctl + ".cornerTy", e =1, keyable=1 )
             
-            if cmds.attributeQuery( "cornerTz", node = ctl, exists=1)==False:
+            if not cmds.attributeQuery( "cornerTz", node = ctl, exists=1):
                 cmds.addAttr( ctl, ln ="cornerTz", attributeType='float', dv = .5 )
                 cmds.setAttr( ctl + ".cornerTz", e =1, keyable=1 )             
         
-            #left corner "jnt.tx" setup
             cmds.connectAttr( loMidJnt+'.tx',  lCorner_mult + '.input1X' )
             # adjust ctl.ornerTx to change the ratio of corner movement
             cmds.connectAttr( ctl + '.cornerTx', lCorner_mult + '.input2X') # default value :0.5   
@@ -2928,45 +2810,44 @@ def swivel_ctrl_setup():
 
         for i in range(jntNum):
         	        		
-        	jotXRotZ_add  = cmds.shadingNode ( 'addDoubleLinear', asUtility=True, n = lipJots[i].replace('JotX','_add') )
-        	cmds.connectAttr ( 'swivel_ctrl.tx', jotXRot_plus[i] + '.input3D[2].input3Dx' )
-        
-        	cmds.connectAttr ( 'swivel_ctrl.tx', jotXMults[i] + '.input1Z' )
-        	cmds.connectAttr ( "lipFactor.lipJotX_rz", jotXMults[i] + '.input2Z' )
-        	cmds.connectAttr ( jotXMults[i] + '.outputZ', jotXRotZ_add + ".input1" )        	
-        	cmds.connectAttr ( 'swivel_ctrl.rz', jotXRotZ_add + ".input2" )
-        	cmds.connectAttr ( jotXRotZ_add + ".output", lipJots[i] +'.rz' )
+            jotXRotZ_add  = cmds.shadingNode ( 'addDoubleLinear', asUtility=True, n = lipJots[i].replace('JotX','_add') )
+            cmds.connectAttr ( 'swivel_ctrl.tx', jotXRot_plus[i] + '.input3D[2].input3Dx' )
+
+            cmds.connectAttr ( 'swivel_ctrl.tx', jotXMults[i] + '.input1Z' )
+            cmds.connectAttr ( "lipFactor.lipJotX_rz", jotXMults[i] + '.input2Z' )
+            cmds.connectAttr ( jotXMults[i] + '.outputZ', jotXRotZ_add + ".input1" )
+            cmds.connectAttr ( 'swivel_ctrl.rz', jotXRotZ_add + ".input2" )
+            cmds.connectAttr ( jotXRotZ_add + ".output", lipJots[i] +'.rz' )
         
         swivelMult = cmds.shadingNode ( 'multiplyDivide', asUtility= True, n = 'swivel_mult' )
-    	cmds.connectAttr ( 'swivel_ctrl.tx', swivelMult + '.input1X' )
-    	cmds.connectAttr ( 'swivel_ctrl.ty', swivelMult + '.input1Y' )
-    	cmds.connectAttr ( 'swivel_ctrl.tz', swivelMult + '.input1Z' )
-    	cmds.connectAttr( "lipFactor.swivelMult_tx", swivelMult + '.input2X' )
-    	cmds.connectAttr( "lipFactor.swivelMult_ty", swivelMult + '.input2Y' )
-    	cmds.connectAttr( "lipFactor.swivelMult_tz", swivelMult + '.input2Z' )
-    	cmds.connectAttr ( swivelMult + '.output', jawSemi + '.t' )
+        cmds.connectAttr ( 'swivel_ctrl.tx', swivelMult + '.input1X' )
+        cmds.connectAttr ( 'swivel_ctrl.ty', swivelMult + '.input1Y' )
+        cmds.connectAttr ( 'swivel_ctrl.tz', swivelMult + '.input1Z' )
+        cmds.connectAttr( "lipFactor.swivelMult_tx", swivelMult + '.input2X' )
+        cmds.connectAttr( "lipFactor.swivelMult_ty", swivelMult + '.input2Y' )
+        cmds.connectAttr( "lipFactor.swivelMult_tz", swivelMult + '.input2Z' )
+        cmds.connectAttr ( swivelMult + '.output', jawSemi + '.t' )
 
+        swivelJawSemiMult = cmds.shadingNode ( 'multiplyDivide', asUtility= True, n = 'swivelJawSemi_mult' )
 
-    	swivelJawSemiMult = cmds.shadingNode ( 'multiplyDivide', asUtility= True, n = 'swivelJawSemi_mult' )    	    
-    	
-    	cmds.connectAttr ( swivelMult + '.output', lipJotP +'.t', f=1 )
-    	#swivel ctl control jawSemi ry / rz
-    	cmds.connectAttr ( 'swivel_ctrl.tx', swivelJawSemiMult + '.input1Y' )
-    	cmds.connectAttr ( 'swivel_ctrl.tx', swivelJawSemiMult + '.input1Z' )
-    	cmds.connectAttr( "lipFactor.lipJotX_ry", swivelJawSemiMult + '.input2Y' )
-    	cmds.connectAttr( "lipFactor.lipJotX_rz", swivelJawSemiMult + '.input2Z' )
-    	cmds.connectAttr ( swivelJawSemiMult + '.outputY', jawSemi + '.ry' )
-    	cmds.connectAttr ( swivelJawSemiMult + '.outputZ', jawSemi + '.rz' )
-		    
-    	'''scale controll'''
-    	# swivel.ty + jawOpen.ty influence scaleX/Z
-    	tranX_add  = cmds.shadingNode ( 'addDoubleLinear', asUtility=True, n = 'ctlX_add' )
-    	tranY_plus  = cmds.shadingNode ( 'plusMinusAverage', asUtility=True, n = 'ctlY_plus' )
-    	jawScale_ratio = cmds.shadingNode ( 'multiplyDivide', asUtility= True, n = 'jawScale_ratio' ) 
-    	lipPcale_sum = cmds.shadingNode ( 'plusMinusAverage', asUtility= True, n = 'lipPScale_sum' )
-    	tranYPowerMult = cmds.shadingNode ( 'multiplyDivide', asUtility= True, n = 'tranYPower_mult' )        
-    	divideMult = cmds.shadingNode ( 'multiplyDivide', asUtility= True, n = 'tranY_divide' )
-    	#lipP scale down as lipP/jawSemi goes down
+        cmds.connectAttr ( swivelMult + '.output', lipJotP +'.t', f=1 )
+        #swivel ctl control jawSemi ry / rz
+        cmds.connectAttr ( 'swivel_ctrl.tx', swivelJawSemiMult + '.input1Y' )
+        cmds.connectAttr ( 'swivel_ctrl.tx', swivelJawSemiMult + '.input1Z' )
+        cmds.connectAttr( "lipFactor.lipJotX_ry", swivelJawSemiMult + '.input2Y' )
+        cmds.connectAttr( "lipFactor.lipJotX_rz", swivelJawSemiMult + '.input2Z' )
+        cmds.connectAttr ( swivelJawSemiMult + '.outputY', jawSemi + '.ry' )
+        cmds.connectAttr ( swivelJawSemiMult + '.outputZ', jawSemi + '.rz' )
+
+        '''scale controll'''
+        # swivel.ty + jawOpen.ty influence scaleX/Z
+        tranX_add  = cmds.shadingNode ( 'addDoubleLinear', asUtility=True, n = 'ctlX_add' )
+        tranY_plus  = cmds.shadingNode ( 'plusMinusAverage', asUtility=True, n = 'ctlY_plus' )
+        jawScale_ratio = cmds.shadingNode ( 'multiplyDivide', asUtility= True, n = 'jawScale_ratio' )
+        lipPcale_sum = cmds.shadingNode ( 'plusMinusAverage', asUtility= True, n = 'lipPScale_sum' )
+        tranYPowerMult = cmds.shadingNode ( 'multiplyDivide', asUtility= True, n = 'tranYPower_mult' )
+        divideMult = cmds.shadingNode ( 'multiplyDivide', asUtility= True, n = 'tranY_divide' )
+        #lipP scale down as lipP/jawSemi goes down
         cmds.connectAttr( "jawClose_jnt.ty", tranY_plus + ".input1D[0]" )#jaw_drop.ty *1
         cmds.connectAttr( "jawSemi.ty", tranY_plus + ".input1D[1]" )#swivel_ctrl.ty * 1
         cmds.connectAttr( "jaw_open.ty", tranY_plus + ".input1D[2]" )# jaw_open.ty * 1
@@ -3021,7 +2902,7 @@ def mouth_move_setup():
         print jotYMult
         for t in range(jntNum):
             cmds.connectAttr ( 'mouth_move.tx', jotYRotY_plus[t] + '.input3D[3].input3Dx' )
-            cmds.connectAttr ( 'mouth_move.ty', jotXRot_plus[t] + '.input3D[3].input3Dy' )                    
+            cmds.connectAttr ( 'mouth_move.ty', jotXRot_plus[t] + '.input3D[3].input3Dy' )
             jotYRotZ_add  = cmds.shadingNode ( 'addDoubleLinear', asUtility=True, n = ryJnts[t].replace('JotY','_add' ) )
             
             cmds.connectAttr ( jotYMult[t]+ '.outputZ', jotYRotZ_add + ".input1" )        	
@@ -3037,7 +2918,7 @@ def mouth_move_setup():
 #check if "*lip_nulP" created on selected curve
 #sequence =['A', 'B', 'C', 'D', 'E']
 #upLow = [ "up","lo"]
-def lipFreeCtl( upLow, numCtls, offset, myCtl ):
+def lipFreeCtl( upLow, nucmdstls, offset, myCtl ):
 
     orderedVerts = cmds.getAttr( "lipFactor." + upLow + "LipVerts" )
     #create guide curve based on lipFactor vtx
@@ -3089,12 +2970,12 @@ def lipFreeCtl( upLow, numCtls, offset, myCtl ):
     lipRollCrv = upLow + "_lipRoll_crv"
 
     #create main lip controller connect with the joints on "lipBS_crv"
-    myList = symmetrNullOnCrv( upLow, crv, numCtls, "lip" )
+    myList = symmetrNullOnCrv( upLow, crv, nucmdstls, "lip" )
     grpList = myList[0]
 
     rollCvs = cmds.ls( lipRollCrv + ".cv[*]", fl=1 )
-    if not len(rollCvs) == numCtls:
-    	x =cmds.rebuildCurve( lipRollCrv, rebuildType = 0, spans = numCtls-3, keepRange = 0, degree = 3 )  
+    if not len(rollCvs) == nucmdstls:
+    	x =cmds.rebuildCurve( lipRollCrv, rebuildType = 0, spans = nucmdstls-3, keepRange = 0, degree = 3 )  
 
     ctlColor = {"darkGrey":2, "green":23, "yellow":22,"orange":21,"pink":20,"brightGreen":19,
     "skyBlue":18, "lemon":17, "white":16, "wasabi":14, "red":13, "darkRed":12, "purple":9, "darkGreen":7,
@@ -3111,7 +2992,7 @@ def lipFreeCtl( upLow, numCtls, offset, myCtl ):
         if myCtl:
             newCtl = cmds.duplicate( myCtl )[0]  
             #이름 수정, CtlP null에 페어런트하고 position에 옮겨놓는다.
-            ctrl = customCtl(  newCtl, null.replace( "_nulP", "Ctl" ), pos )
+            ctrl = customCtls(newCtl, null.replace("_nulP", "Ctl"), pos)
                 
         else:
             ctrl = arcController( null.replace("_nulP","Ctl"), pos, cvLen/30, "cc" )
@@ -3172,7 +3053,7 @@ def lipFreeCtl( upLow, numCtls, offset, myCtl ):
     	cmds.connectAttr( ctl[0] + ".tz", plus + ".input1D[1]" )
     	cmds.connectAttr( ctl[0] + ".r", rollJnt[i] + ".r" )
     	cmds.connectAttr( ctl[0] + ".s", rollJnt[i] + ".s" )    	
-    	#cmds.connectAttr( pocList[i] + ".position", grp + ".t" )Tue Nov 26 18:20:07 2019         
+    	#cmds.connectAttr( pocList[index] + ".position", grp + ".t" )Tue Nov 26 18:20:07 2019
     	cmds.parent( prnt, "lip_dtailCtl_grp" ) 
     	
 
@@ -3225,13 +3106,13 @@ def lipPuff_crvSetup( numDetails ):
 
 # r_corner, A, B, C..., l_corner       
 #put null(with lip Name) at poc node on curve evenly
-def nullEvenOnCrv( crv, numCtls, name ):
+def nullEvenOnCrv( crv, nucmdstls, name ):
 
-    pocs =pocEvenOnCrv( crv, numCtls, name )
-    center = (numCtls-1)/2
+    pocs =pocEvenOnCrv( crv, nucmdstls, name )
+    center = (nucmdstls-1)/2
     
     nulls =[]
-    for i in range( numCtls ):
+    for i in range( nucmdstls ):
         pos = cmds.getAttr( pocs[i] + ".position")[0]
         #create ctl joints grp
         null = cmds.group( em=1, n = str(i) + name + "_nulP" )        	
@@ -3243,9 +3124,9 @@ def nullEvenOnCrv( crv, numCtls, name ):
 
 
 
-def symmetryLetter(numCtl): 
+def symmetryLetter(nucmdstl): 
   
-    center = (numCtl-1)/2
+    center = (nucmdstl-1)/2
     corner=[]
     left = []
     right = []
@@ -3265,22 +3146,22 @@ def symmetryLetter(numCtl):
 
 
 # upLow = ["up", "lo", ""(for brows) ]
-def symmetrNullOnCrv( upLow, crv, numCtls, name ):
+def symmetrNullOnCrv( upLow, crv, nucmdstls, name ):
     nName = upLow + "_" + name
-    pocs = pocEvenOnCrv( crv, numCtls, nName )
+    pocs = pocEvenOnCrv( crv, nucmdstls, nName )
    
     sequence = string.ascii_uppercase
-    letters = symmetryLetter(numCtls)
+    letters = symmetryLetter(nucmdstls)
     nulls = []
     
     if upLow in ["up", ""]:
         minNum = 0
-        maxNum = numCtls
-        center = (numCtls-1)/2
+        maxNum = nucmdstls
+        center = (nucmdstls-1)/2
     elif upLow == "lo":
         minNum = 1
-        maxNum = numCtls-1
-        center = (numCtls-3)/2
+        maxNum = nucmdstls-1
+        center = (nucmdstls-3)/2
                
     for i in range(minNum, maxNum):
 
@@ -3290,9 +3171,9 @@ def symmetrNullOnCrv( upLow, crv, numCtls, name ):
             null = cmds.group( em=1, n = "rCorner_" + name +"_nulP" )       
             cmds.connectAttr( pocs[0] + ".position", null + ".t" )
                
-        elif i ==  numCtls-1 :
+        elif i ==  nucmdstls-1 :
             lCorner ="lCorner_" + name +"_nulP"          
-            lPos = cmds.getAttr( pocs[numCtls-1] + ".position")[0]
+            lPos = cmds.getAttr( pocs[nucmdstls-1] + ".position")[0]
             null = cmds.group( em=1, n = "lCorner_" + name +"_nulP" )       
             cmds.connectAttr( pocs[i] + ".position", null + ".t" )
         
@@ -3453,6 +3334,7 @@ def lipFactorWIP():
     cmds.addAttr('faceFactors', longName= 'YZPoc_rollJntT_tz', attributeType='float', dv =2 )
 ##########################################################
 
+
 def faceFactorFix():
     if not cmds.objExists("lipFactor"):
         
@@ -3503,19 +3385,19 @@ def mouthCtlToCrv():
 		rollJnts.append(x)
 		ryJnts.append(y) 
 
-	for i in range(jntNum):        
+	for index in range(jntNum):        
 		if cmds.objExists("swivel_ctrl"):
 		
-			jotXRotZ_add  = cmds.shadingNode ( 'addDoubleLinear', asUtility=True, n = upLow + 'JotX' + str(i) +'_add' )
-			cmds.connectAttr ( 'swivel_ctrl.tx', jotXMults[i] + '.input1Y' )
-			cmds.connectAttr ( "lipFactor.lipJotX_ry", jotXMults[i] + '.input2Y' )        	
-			cmds.connectAttr ( jotXMults[i]+ '.outputY', lipJots[i] +'.ry')
+			jotXRotZ_add  = cmds.shadingNode ( 'addDoubleLinear', asUtility=True, n = upLow + 'JotX' + str(index) +'_add' )
+			cmds.connectAttr ( 'swivel_ctrl.tx', jotXMults[index] + '.input1Y' )
+			cmds.connectAttr ( "lipFactor.lipJotX_ry", jotXMults[index] + '.input2Y' )        	
+			cmds.connectAttr ( jotXMults[index]+ '.outputY', lipJots[index] +'.ry')
 		
-			cmds.connectAttr ( 'swivel_ctrl.tx', jotXMults[i] + '.input1Z' )
-			cmds.connectAttr ( "lipFactor.lipJotX_rz", jotXMults[i] + '.input2Z' )
-			cmds.connectAttr ( jotXMults[i] + '.outputZ', jotXRotZ_add + ".input1" )        	
+			cmds.connectAttr ( 'swivel_ctrl.tx', jotXMults[index] + '.input1Z' )
+			cmds.connectAttr ( "lipFactor.lipJotX_rz", jotXMults[index] + '.input2Z' )
+			cmds.connectAttr ( jotXMults[index] + '.outputZ', jotXRotZ_add + ".input1" )        	
 			cmds.connectAttr ( 'swivel_ctrl.rz', jotXRotZ_add + ".input2" )
-			cmds.connectAttr ( jotXRotZ_add + ".output", lipJots[i] +'.rz' )
+			cmds.connectAttr ( jotXRotZ_add + ".output", lipJots[index] +'.rz' )
 			
 	cmds.connectAttr ( 'swivel_ctrl.tx', 'jawSemi.tx' )
 	cmds.connectAttr ( 'swivel_ctrl.ty', 'jawSemi.ty' )
@@ -3610,7 +3492,7 @@ def mouthCtlToCrv():
 
 
 def extraCrvToJoint():
-        #tyPoc =cmds.shadingNode ( 'pointOnCurveInfo', asUtility=True, n = upLow +'LipTy' + str(i).zfill(2) + '_poc' )
+        #tyPoc =cmds.shadingNode ( 'pointOnCurveInfo', asUtility=True, n = upLow +'LipTy' + str(index).zfill(2) + '_poc' )
         TYpoc = upLow +'_jawDrop' + str(i).zfill(2) + '_poc'
         initJawDropX = cmds.getAttr ( TYpoc + '.positionX' )
         initJawDropY = cmds.getAttr ( TYpoc + '.positionY' )
@@ -3703,7 +3585,8 @@ def getDagPath(objectName):
 
 #curve rename
 def renameCrvShape( crvs ):
-    
+
+    name = None
     for crv in crvs:
         crvChild = cmds.listRelatives( crv, c=1, fullPath=1, typ = "nurbsCurve")[0]
         print crvChild
@@ -3716,8 +3599,8 @@ def renameCrvShape( crvs ):
 
 
 #rename, parent Null and place it on the position
-#이름 수정, CtlP null에 페어런트하고 position에 옮겨놓는다.
-def customCtl(  obj, ctlName, position ):        
+#이름 수정, CtlP null에 페어런트하고 position에 옮겨놓는다. customCtl
+def customCtls(obj, ctlName, position):
     
     nCtl = cmds.rename( obj, ctlName )
 
@@ -3795,11 +3678,6 @@ def arcController( ctlName, position, radius, ctlShape ):
 
 
 
-
-
-
-
-
 def LRBlendShapeWeight( lipCrv, lipCrvBS):
     cvs = cmds.ls(lipCrv+'.cv[*]', fl =1)
     length = len (cvs)
@@ -3825,7 +3703,7 @@ def LRBlendShapeWeight( lipCrv, lipCrvBS):
 
 
 
-# list selected vertices in order( starting with first selected vert )
+# list selected vertices in order( starting with center vertex )
 def loopVertices_inOrder( myVert ):
 
     firstVert = myVert[0]
@@ -3875,8 +3753,7 @@ def vertices_distanceOrder( myVert ):
             vertDist[ vt ] = dist    
         
         secondVert = min(vertDist, key= vertDist.get) 
-        print secondVert    
-    
+
         orderedVerts.append(secondVert)
         firstVert = secondVert
                                 
@@ -3911,41 +3788,20 @@ def curve_halfVerts( myVert, name, openClose, degree ):
         cmds.delete( crvRebuild[0], ch=1 )
 
 
-def EPCurve_chordLength():
-    vtx = cmds.ls( os=1, fl=1 )
-    vt = cmds.xform( vtx[0], q=1, t=1, ws=1)
-    orderPos =[]
-    # verts selection is only left part
-    if vt[0]**2 <0.001:
-	    for t in vtx[1:][::-1]:
-		    vtxPos = cmds.xform( t, q=1, t=1, ws=1)
-		    mrrPos = [-vtxPos[0],vtxPos[1],vtxPos[2]]
-		    if vtxPos[0]-mrrPos[0]>0.001:
-			    orderPos.append(mrrPos)        
-	    print len(orderPos), 
-	    for v in vtx:		    
-		    vtxPos = cmds.xform( v, q=1, t=1, ws=1)
-		    orderPos.append(vtxPos)
-
-    coords = orderPos
-    curveFn = OpenMaya.MFnNurbsCurve() 
-    arr = OpenMaya.MPointArray() 
-    
-    for pos in coords: 
-        arr.append(*pos) 
-    print arr
-    curveFn.createWithEditPoints( 
-                                  arr, 
-                                  3, 
-                                  OpenMaya.MFnNurbsCurve.kPeriodic, 
-                                  False, 
-                                  False, 
-                                  True 
-                         	    ) 
-                         	    
                          	    
 #select left vtx
 def mapEPCurve( vtx, name, openClose, degree ):
+    """
+    select left half vertices
+    Args:
+        vtx:
+        name:
+        openClose:
+        degree:
+
+    Returns:
+
+    """
       
     orderPos =[]
     if name in ["brow","lip"]:
@@ -3965,7 +3821,6 @@ def mapEPCurve( vtx, name, openClose, degree ):
                 
         # if verts selection in order entire region
         else:
-            cmds.confirmDialog( title='Confirm', message='object or first vertex is off from center in X axis' )
             for v in vtx:
                 vtxPos = cmds.xform( v, q=1, t=1, ws=1)
                 orderPos.append(vtxPos)
@@ -3977,7 +3832,7 @@ def mapEPCurve( vtx, name, openClose, degree ):
             orderPos.append(vtxPos)
                    
     if openClose == "open":
-        browMapCrv = cmds.curve( d=float(degree), p=orderPos )
+        browMapCrv = cmds.curve( d=int(degree), p=orderPos )
         cmds.rename( browMapCrv,  name + "MapCrv01" )
     
     elif openClose == "close":
@@ -3986,9 +3841,9 @@ def mapEPCurve( vtx, name, openClose, degree ):
         curveFn = OpenMaya.MFnNurbsCurve() 
         arr = OpenMaya.MPointArray()
         for pos in coords: 
-            arr.append(*pos)            
+            arr.append(*pos)
         
-        curveFn.createWithEditPoints( 
+        mObject = curveFn.createWithEditPoints(
                                       arr, 
                                       int(degree), 
                                       OpenMaya.MFnNurbsCurve.kPeriodic, 
@@ -3996,7 +3851,10 @@ def mapEPCurve( vtx, name, openClose, degree ):
                                       False, 
                                       True 
                                     )
-                
+        mod = OpenMaya.MDagModifier()
+        mod.renameNode(mObject, name + "MapCrv01")
+        mod.doIt()
+
 
 #버텍스 반만 순서대로 선택하면 미러한 포지션으로 커프를 만든다./ vtx = 이미 순서대로 정열된 버텍스 리스트
 #geo should be symmetrical/ for open curve or curve is part of edge loop  
@@ -4006,7 +3864,6 @@ def mapCurve( vtx, name, openClose, degree ):
     mirrOrderPos =[] 
     if name.split("_")[0] in ["brow","lip"]:
         vt = cmds.xform( vtx[0], q=1, t=1, ws=1)
-        # verts selection is only left part
         if vt[0]**2 < 0.00001:
             for t in vtx[1:][::-1]:
                 vtxPos = cmds.xform( t, q=1, t=1, ws=1)
@@ -4048,8 +3905,8 @@ def mapCurve( vtx, name, openClose, degree ):
         '''closedOrderPos = orderPos + orderPos[:3]
         numPoint = len(closedOrderPos)
         knots = []
-        for i in range(numPoint+2):
-            knots.append(i)
+        for index in range(numPoint+2):
+            knots.append(index)
 
         closeCrv = cmds.curve( d=float(degree), per=1, p=closedOrderPos, k = knots )    
         cmds.rename( closeCrv,  name + "MapCrv01" )'''        
@@ -4076,7 +3933,7 @@ def mapCurve( vtx, name, openClose, degree ):
         cmds.delete( guideCircle, ch=1)
         
         return guideCircle
-# mapCurve(3, "open", "lip" )'''
+
 
 
 
@@ -4353,7 +4210,7 @@ def eyeMapSkinning():
     	else:
     		
     		crvLen = faceLen/jntNum + 1
-    		#how many vertices will be weight for each joint = curve length
+    		#how many vertices will be weight for each joint = curve browLength
     		vrtPerJnt = crvLen
     		skin = headSkinObj(surf)
 	        #skinWeight 100% to "headSkel_jnt" 
@@ -4704,32 +4561,32 @@ def updateHierachy():
     midCtlGrp= 'midCtl_grp'
     if cmds.objExists( midCtlGrp ):
         midCtls = cmds.listRelatives( midCtlGrp, c=1 )
-        for mc in midCtls:
-            name = mc.split('_')
-            if mc[:2] in [ 'l_', 'r_' ]:
+        for cmds in midCtls:
+            name = cmds.split('_')
+            if cmds[:2] in [ 'l_', 'r_' ]:
                 
                 loc = name[1]+'Pos'
                 if cmds.objExists( loc ):
-                    print mc
+                    print cmds
                     pos = cmds.xform( loc, q=1, ws=1, t=1 )               
-                    if mc[:2] == "l_":
-                        cmds.xform( mc, ws = 1, t = pos )
-                    elif mc[:2] == "r_":
-                        cmds.xform( mc, ws = 1, t =( -pos[0], pos[1], pos[2]) )
+                    if cmds[:2] == "l_":
+                        cmds.xform( cmds, ws = 1, t = pos )
+                    elif cmds[:2] == "r_":
+                        cmds.xform( cmds, ws = 1, t =( -pos[0], pos[1], pos[2]) )
             
                 elif name[1] == 'ear':
                     lEarPos = cmds.xform('lEarPos', t = True, q = True, ws = True )
-                    if mc[:2] == "l_":
-                        cmds.xform( mc, ws = 1, t = lEarPos )
-                    elif mc[:2] == "r_":
-                        cmds.xform( mc, ws = 1, t =( -lEarPos[0], lEarPos[1], lEarPos[2]) )                 
+                    if cmds[:2] == "l_":
+                        cmds.xform( cmds, ws = 1, t = lEarPos )
+                    elif cmds[:2] == "r_":
+                        cmds.xform( cmds, ws = 1, t =( -lEarPos[0], lEarPos[1], lEarPos[2]) )                 
             
             else:
                 loc = name[0]+'Pos'
                 if cmds.objExists( loc ):
                     print loc
                     pos = cmds.xform( loc, q=1, ws=1, t=1 )
-                    cmds.xform( mc, ws = 1, t = pos )    
+                    cmds.xform( cmds, ws = 1, t = pos )    
 
     clusterDict = { 'jawRigPos': ['jawOpen_cls', 'mouth_cls'], 'lipYPos':'lip_cls', 'lipRollPos':'lipRoll_cls', 'cheekPos':['l_cheek_cls','r_cheek_cls'], 
     'lEyePos':['l_eyeBlink_cls', 'l_eyeWide_cls'], 'rEyePos':['r_eyeBlink_cls', 'r_eyeWide_cls'], 'lowCheekPos': ['l_lowCheek_cls', 'r_lowCheek_cls'], 'squintPuffPos':['l_squintPuff_cls', 'r_squintPuff_cls'], 
@@ -5022,18 +4879,18 @@ def update_faceMain():
                                     
                                     #eyeAimNull fix
                                     eyeAimNull = prefix[:2] + "eyeAimNull"
-                                    const = cmds.listRelatives( eyeAimNull, c=1, typ = "aimConstraint")
+                                    const = cmds.listRelatives( eyeAimNull, c=1, typ = "aicmdsonstraint")
                                     if const:
                                         cmds.delete(const[0])
                                         
                                     cmds.xform(  eyeAimNull, ws=1, t= newEyePos )
                                     cmds.xform(  eyeAimNull,  ws=1, ro=(0,0,0) )                            
-                                    const = cmds.aimConstraint( prefix[:2] + "eyeAim_ctl", eyeAimNull, mo=1, aimVector =[0, 0, 1], upVector=[0, 1, 0] )                    
+                                    const = cmds.aicmdsonstraint( prefix[:2] + "eyeAim_ctl", eyeAimNull, mo=1, aimVector =[0, 0, 1], upVector=[0, 1, 0] )                    
                         
                     # 2. adjust eye joints position
                     blinkJnts = cmds.ls( prefix + "*LidBlink*_jnt" )
                     lidJnts = cmds.listRelatives( blinkJnts, c=1, typ="joint" )
-                    lidConst = cmds.listRelatives( blinkJnts, c=1, typ="aimConstraint" )
+                    lidConst = cmds.listRelatives( blinkJnts, c=1, typ="aicmdsonstraint" )
                     eyeLocs = cmds.ls( prefix + "Loc*", typ = "transform" )
                     cmds.delete( lidConst )
                     cmds.parent( lidJnts, w=1 )
@@ -5081,10 +4938,10 @@ def update_faceMain():
                         for i, vPos in enumerate(posOrder):
     
                             cmds.xform( lidJnts[i], ws=1, t= vPos )
-                            #cmds.xform( eyeLocs[i], ws=1, t= vPos )                        
+                            #cmds.xform( eyeLocs[index], ws=1, t= vPos )
                             cmds.parent ( lidJnts[i], blinkJnts[i] )
-                            #cmds.joint ( cmds.listRelatives(blinkJnts[i],p=1)[0], e =True, ch=True, zso =True, oj = 'zyx', sao= 'yup')
-                            cmds.aimConstraint( eyeLocs[i], blinkJnts[i], mo =1, weight=1, aimVector = (0,0,1), upVector = (0,1,0), worldUpType="object", worldUpObject = prefix[:2] + "eyeUp_loc", n = blinkJnts[i].replace("jnt", "aimConst" )  )                                    
+                            #cmds.joint ( cmds.listRelatives(blinkJnts[index],p=1)[0], e =True, ch=True, zso =True, oj = 'zyx', sao= 'yup')
+                            cmds.aicmdsonstraint( eyeLocs[i], blinkJnts[i], mo =1, weight=1, aimVector = (0,0,1), upVector = (0,1,0), worldUpType="object", worldUpObject = prefix[:2] + "eyeUp_loc", n = blinkJnts[i].replace("jnt", "aicmdsonst" )  )                                    
                         
                         newCurves.append( newHiCrv )
                         newCurves.append( newCtlCrv )                    
@@ -5345,18 +5202,18 @@ def update_clsFaceMain():
                                     
                                     #eyeAimNull fix
                                     eyeAimNull = prefix[:2] + "eyeAimNull"
-                                    const = cmds.listRelatives( eyeAimNull, c=1, typ = "aimConstraint")
+                                    const = cmds.listRelatives( eyeAimNull, c=1, typ = "aimdsonstraint")
                                     if const:
                                         cmds.delete(const[0])
                                         
                                     cmds.xform(  eyeAimNull, ws=1, t= newEyePos )
                                     cmds.xform(  eyeAimNull,  ws=1, ro=(0,0,0) )                            
-                                    const = cmds.aimConstraint( prefix[:2] + "eyeAim_ctl", eyeAimNull, mo=1, aimVector =[0, 0, 1], upVector=[0, 1, 0] )                    
+                                    const = cmds.aicmdsonstraint( prefix[:2] + "eyeAim_ctl", eyeAimNull, mo=1, aimVector =[0, 0, 1], upVector=[0, 1, 0] )                    
                         
                     # 2. adjust eye joints position
                     blinkJnts = cmds.ls( prefix + "*LidBlink*_jnt" )
                     lidJnts = cmds.listRelatives( blinkJnts, c=1, typ="joint" )# l_upLid*_jnt
-                    lidConst = cmds.listRelatives( blinkJnts, c=1, typ="aimConstraint" )
+                    lidConst = cmds.listRelatives( blinkJnts, c=1, typ="aimdsonstraint" )
                     eyeLocs = cmds.ls( prefix + "Loc*", typ = "transform" )
                     cmds.delete( lidConst )
                     cmds.parent( lidJnts, w=1 )
@@ -5417,10 +5274,10 @@ def update_clsFaceMain():
                                 valStr += str(copyWgt)+" "                     
                             
                             #aim constraint handle parent node
-                            const = cmds.aimConstraint( eyeLocs[i], handlePrnt, mo =0, weight=1, aimVector = (0,0,1), upVector = (0,1,0), worldUpType="object", worldUpObject = prefix[:2] + "eyeUp_loc", n = Jnt.replace("jnt", "aimConst" )  )                                    
+                            const = cmds.aicmdsonstraint( eyeLocs[i], handlePrnt, mo =0, weight=1, aimVector = (0,0,1), upVector = (0,1,0), worldUpType="object", worldUpObject = prefix[:2] + "eyeUp_loc", n = Jnt.replace("jnt", "aicmdsonst" )  )                                    
                             cmds.delete(const)
                             
-                            cmds.aimConstraint( eyeLocs[i], handle, mo =1, weight=1, aimVector = (0,0,1), upVector = (0,1,0), worldUpType="object", worldUpObject = prefix[:2] + "eyeUp_loc", n = Jnt.replace("jnt", "aimConst" )  ) 
+                            cmds.aicmdsonstraint( eyeLocs[i], handle, mo =1, weight=1, aimVector = (0,0,1), upVector = (0,1,0), worldUpType="object", worldUpObject = prefix[:2] + "eyeUp_loc", n = Jnt.replace("jnt", "aicmdsonst" )  ) 
                             cls = cmds.cluster( headGeo, n = handle.replace("_null","_nCls") )
                             cmds.cluster( cls[0], e=1, bindState=1, wn = ( handle , handle ) )
                             cmds.parent ( lidJnts[i], handle )
@@ -5506,7 +5363,7 @@ def update_ctlConnection(prefix):
         cmds.parent( targetCtlCrv + "_tgtGrp", eyeShapeCrv_grp )
         
         blinkJnts = cmds.ls( prefix + "LidBlink*_jnt" )
-        lidConst = cmds.listRelatives( blinkJnts, c=1, typ="aimConstraint" )
+        lidConst = cmds.listRelatives( blinkJnts, c=1, typ="aicmdsonstraint" )
         for con in lidConst:
             cmds.setAttr( con + ".nodeState", 0 )
         
@@ -5630,7 +5487,7 @@ def getOrigMesh( obj ):
 
 
 def mirrorVertice( verts ):
-    headMesh = cmds.getAttr("helpPanel_grp.headGeo")
+    headMesh = verts[0].split(".")[0]
     cpmNode = cmds.createNode("closestPointOnMesh", n = "closestPointM_node")
     cmds.connectAttr( headMesh + ".outMesh", cpmNode + ".inMesh")
     cmds.connectAttr( headMesh + ".worldMatrix[0]", cpmNode +".inputMatrix" )
@@ -5765,7 +5622,7 @@ def deleteUnknown_plugins():
 #set keys on all ctrls
 def dgTimer():
     dataPath = cmds.fileDialog2(fileMode=3, caption="set directory")
-    #cmds.file( filename[0], i=True );
+    #cmds.file( filename[0], index=True );
     i = 0
     while os.path.isdir(dataPath[0] + "/dgTimer%s"%i):   
         i += 1
@@ -5789,7 +5646,7 @@ def dgTimer():
     
     
 
-# select headGeo(or polyToCurve) and ctls( or parent👈) that are on the skin 
+# select headGeo(or polyToCurve) and ctls( or parent👈) that are on the skin
 def stickCtlToFace( obj, ctls ):
 
     objShp = cmds.listRelatives( obj, c=1, ni =1, s=1 )[0]
@@ -5873,7 +5730,7 @@ def ctlShapeSwap( source, transform):
 
 #create uniform curve with 32 evenly spaced CVs.
 #create curve with same structure( same starting point / number of cvs ) 
-def create_uniformCurve( mapCrv, name ):
+def create_uniforcmdsurve( mapCrv, name ):
     
     crvShp = cmds.listRelatives( mapCrv, c=1, ni =1, s=1 )[0]
     print crvShp
@@ -5886,34 +5743,34 @@ def create_uniformCurve( mapCrv, name ):
         increm = 1.0/30
         for i in range(31):           
         
-            parameter = crvFn.findParamFromLength(crvFn.length() * increm * i)
+            parameter = crvFn.findParamFromLength(crvFn.browLength() * increm * i)
             point = OpenMaya.MPoint()
             crvFn.getPointAtParam(parameter, point)
             pos = [point.x, point.y, point.z]
             posList.append(pos)
             
-        uniformCrv =[ cmds.curve( d=3, p=posList, n= name + "_uniCrv0" + mapCrv[-1] ) ]
-        cmds.xform( uniformCrv[0], cp=1)
+        uniforcmdsrv =[ cmds.curve( d=3, p=posList, n= name + "_uniCrv0" + mapCrv[-1] ) ]
+        cmds.xform( uniforcmdsrv[0], cp=1)
             
     if crvForm in [1,2]: # if crv form is close
         
-        uniformCrv = cmds.circle( c = (0,0,0), nr = (0,0,1), sw = 360, r=1, d=3, tol = 0.01, s=32, n = name + "_uniCrv0" + mapCrv[-1] )
-        cmds.reverseCurve( uniformCrv[0], ch =1, rpo =1 )    
-        crvCvs = cmds.ls( uniformCrv[0] + '.cv[*]', fl=1 )
+        uniforcmdsrv = cmds.circle( c = (0,0,0), nr = (0,0,1), sw = 360, r=1, d=3, tol = 0.01, s=32, n = name + "_uniCrv0" + mapCrv[-1] )
+        cmds.reverseCurve( uniforcmdsrv[0], ch =1, rpo =1 )    
+        crvCvs = cmds.ls( uniforcmdsrv[0] + '.cv[*]', fl=1 )
             
         increm = 1.0/32
         for i in range(32): 
         
-            parameter = crvFn.findParamFromLength(crvFn.length() * increm * i)
+            parameter = crvFn.findParamFromLength(crvFn.browLength() * increm * i)
             point = OpenMaya.MPoint()
             crvFn.getPointAtParam(parameter, point)
             pos = [point.x, point.y, point.z]
             print parameter
             cmds.xform( crvCvs[i], ws=1, t= pos )
         
-        cmds.xform( uniformCrv[0], cp=1)
+        cmds.xform( uniforcmdsrv[0], cp=1)
     
-    return uniformCrv[0]
+    return uniforcmdsrv[0]
 
 
 
@@ -5921,7 +5778,7 @@ def create_uniformCurve( mapCrv, name ):
 def createJntAlongCrv( numJnt, title ):
     #gather info
     crvSel = cmds.ls(sl=1)[0]
-    uniCrv = create_uniformCurve( crvSel, title )  
+    uniCrv = create_uniforcmdsurve( crvSel, title )  
     increm = 1.0/numJnt
     jnts = []
     for i in range( 0, numJnt+1 ):
@@ -6093,7 +5950,7 @@ def dnCrv_srcUParam( scCrv, dnCrv, name):
         
     else:
         uParams = cmds.getAttr( scCrv +'.uParam' )
-        numCvs = len(uParams)
+        nucmdsvs = len(uParams)
         
         dnCrvShp = cmds.listRelatives( dnCrv, c=1 )[0]
         if not cmds.getAttr( dnCrvShp + ".maxValue" )== 1:

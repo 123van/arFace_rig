@@ -117,9 +117,7 @@ class EyeRig(face_utils.Util):
             cmds.setAttr("lidFactor.{}ParamPolyCrv".format(upLow), type="stringArray",
                          *([len(self.parameter[upLow])] + self.parameter[upLow]))
 
-            ordered = self.orderedVerts["l_{}".format(upLow)]
-            ordered.remove(cornerVtx[0])
-            ordered.remove(cornerVtx[1])
+            ordered = self.orderedVerts["l_{}".format(upLow)][1:-1]
 
             for index, vtx in enumerate(ordered):
                 vertPos = cmds.xform(vtx, t=True, q=True, ws=True)
@@ -152,7 +150,9 @@ class EyeRig(face_utils.Util):
             cornerJnt, cornerWideJnt = self.eyeJntOnVtx(baseJnt, cornerBaseName, position)
 
             self.eyeCornerDict["l_"].append(cornerJnt)
+            self.eyeCornerDict["r_"].append(cornerJnt.replace("l_", "r_"))
             self.eyeWideCornerDict["l_"].append(cornerWideJnt)
+            self.eyeWideCornerDict["r_"].append(cornerWideJnt.replace("l_", "r_"))
 
         if not cmds.attributeQuery("l_wideCornerJnt", node="lidFactor", exists=1):
             cmds.addAttr("lidFactor", ln="l_wideCornerJnt", dt="stringArray")
@@ -217,15 +217,12 @@ class EyeRig(face_utils.Util):
                 cmds.rebuildCurve(rebuildType=0, spans=numOfCtl - 1, keepRange=0, keepControlPoints=0, degree=1)
                 shapeCrv = cmds.rename(tempBSCrv, '{}{}Shape_crv'.format(LR, upLow))
 
-                tempRollCrv = cmds.curve(d=3, p=([0, 0, 0], [0.25*val, 0, 0], [0.5*val, 0, 0], [0.75*val, 0, 0],
-                                                 [1*val, 0, 0]))
-                cmds.rebuildCurve(rebuildType=0, spans=numOfCtl - 3, keepRange=0, keepControlPoints=0, degree=3)
-                lidRollCrv = cmds.rename(tempRollCrv, '{}{}LidRoll_crv'.format(LR, upLow))
+                lidRollCrv = cmds.duplicate(shapeCrv, rc=1, n='{}{}LidRoll_crv'.format(LR, upLow))[0]
                 lidRollCrvShape = cmds.listRelatives(lidRollCrv, c=1)[0]
 
                 tmpSclCrv = cmds.curve(d=3, p=([0, 1, 1], [0.25*val, 1, 1], [0.5*val, 1, 1], [0.75*val, 1, 1],
                                                [1*val, 1, 1]))
-                cmds.rebuildCurve(rebuildType=0, spans=numOfCtl - 3, keepRange=0, keepControlPoints=0, degree=3)
+                cmds.rebuildCurve(rebuildType=0, spans=numOfCtl - 1, keepRange=0, keepControlPoints=0, degree=1)
                 lidScaleCrv = cmds.rename(tmpSclCrv, '{}{}LidScale_crv'.format(LR, upLow))
                 lidScaleCrvShape = cmds.listRelatives(lidScaleCrv, c=1)[0]
 
@@ -322,11 +319,16 @@ class EyeRig(face_utils.Util):
         cmds.connectAttr('{}.outputX'.format(self.reverseMult), '{}.input2X'.format(rotMult))
         cmds.connectAttr('{}.outputX'.format(rotMult), '{}.rx'.format(lidJnt))
 
-        cmds.connectAttr("{}lidScale_ctl.tx".format(LR), '{}.input3D[0].input3Dx'.format(rotPlus))
+        if LR == "l_":
+            cmds.connectAttr("{}lidScale_ctl.tx".format(LR), '{}.input3D[0].input3Dx'.format(rotPlus))
+            cmds.connectAttr("lidFactor.lidRotateY_scale", '{}.input2Y'.format(rotMult))
+        else:
+            cmds.connectAttr("{}.outputZ".format(self.reverseMult), '{}.input3D[0].input3Dx'.format(rotPlus))
+            cmds.connectAttr("{}.outputY".format(self.reverseMult), '{}.input2Y'.format(rotMult))
+
         cmds.connectAttr("{}.positionX".format(poc), '{}.input3D[1].input3Dx'.format(rotPlus))
         cmds.setAttr('{}.input3D[2].input3Dx'.format(rotPlus), initialX*-1)
         cmds.connectAttr('{}.output3Dx'.format(rotPlus), '{}.input1Y'.format(rotMult))
-        cmds.connectAttr("lidFactor.lidRotateY_scale", '{}.input2Y'.format(rotMult))
         cmds.connectAttr('{}.outputY'.format(rotMult), '{}.ry'.format(lidJnt))
 
         # LidRoll_rotationX connection( lidRoll_jnt.rz = lidRoll_poc.ty )
@@ -371,24 +373,21 @@ class EyeRig(face_utils.Util):
             for upLow in ["up", "lo"]:
 
                 if not self.orderedVerts[LR + upLow]:
-                    if LR == "l_":
-                        self.orderedVerts["l_{}".format(upLow)] = cmds.getAttr("lidFactor.l_{}LidVerts".format(upLow))
-                    elif LR == "r_":
-                        self.orderedVerts["r_{}".format(upLow)] = cmds.getAttr("lidFactor.r_{}LidVerts".format(upLow))
+
+                    self.orderedVerts["{}{}".format(LR, upLow)] = cmds.getAttr(
+                        "lidFactor.{}{}LidVerts".format(LR, upLow))
 
                 if not self.parameter[upLow]:
                     self.parameter[upLow] = cmds.getAttr("lidFactor.{}ParamPolyCrv".format(upLow))
 
-                tempWideCrv = cmds.curve(d=3, p=([0, 0, 0], [0.25*val, 0, 0], [0.5*val, 0, 0], [0.75*val, 0, 0],
-                                                 [1*val, 0, 0]))
-                cmds.rebuildCurve(rebuildType=0, spans=2, keepRange=0, keepControlPoints=0, degree=3)
-                wideCrv = cmds.rename(tempWideCrv, '{}{}Wide_crv'.format(LR, upLow))
+                shapeCrv = '{}{}Shape_crv'.format(LR, upLow)
+                wideCrv = cmds.duplicate(shapeCrv, rc=1, n='{}{}Wide_crv'.format(LR, upLow))[0]
                 wideCrvShape = cmds.listRelatives(wideCrv, c=1)[0]
 
-                targetList = ["ALid", "BLid", "CLid", "DLid", "Squint", "Annoyed", "Blink", "Open"]
+                targetList = ["Squint", "Annoyed", "Blink", "Open", "BrowUp", "BrowDown"]
                 wideShpCrvs = self.lidBlendShape(wideCrv, targetList)
                 cmds.parent(wideShpCrvs, "{}{}Crv_grp".format(LR, upLow))
-                cmds.parent(wideCrv, "eyeCrv_grp")
+                #cmds.parent(wideCrv, "eyeCrv_grp")
 
                 if not self.wideJntDict[LR+upLow]:
                     self.wideJntDict[LR+upLow] = cmds.getAttr("lidFactor.{}{}WideJnt".format(LR, upLow))
@@ -418,21 +417,29 @@ class EyeRig(face_utils.Util):
         wideMult = cmds.shadingNode('multiplyDivide', asUtility=True, n=wideJnt.replace("LidWide", "WideMult"))
         addDouble = cmds.shadingNode('addDoubleLinear', asUtility=True, n=wideJnt.replace("LidWide", "WideAdd"))
         wideSum = cmds.listConnections(wideJnt, s=1, d=0, t="plusMinusAverage", scn=1)[0]
+        reverseMult = "lidRotFactor_reverseMult"
         initialX = cmds.getAttr(widePoc + '.positionX')
 
         # wideJnt rotationZ(up/down) connection with curve
         cmds.connectAttr("{}.positionY".format(widePoc), '{}.input1Y'.format(wideMult))
-        cmds.connectAttr("lidFactor.lidRotateX_scale", '{}.input2Y'.format(wideMult))
-        cmds.connectAttr('{}.outputX'.format(wideMult), "{}.input3D[1].input3Dx".format(wideSum))
+        cmds.connectAttr("{}.outputX".format(reverseMult), '{}.input2Y'.format(wideMult))
+        cmds.connectAttr('{}.outputY'.format(wideMult), "{}.input3D[1].input3Dx".format(wideSum))
+        cmds.connectAttr('{}.outputX'.format(wideMult), "{}.input3D[1].input3Dy".format(wideSum))
 
         # wideJnt rotationY(left/right) connection with curve
         cmds.connectAttr("{}.positionX".format(widePoc), "{}.input1".format(addDouble))
         cmds.setAttr("{}.input2".format(addDouble), initialX*-1)
         cmds.connectAttr("{}.output".format(addDouble), '{}.input1X'.format(wideMult))
-        cmds.connectAttr("lidFactor.lidRotateY_scale", '{}.input2X'.format(wideMult))
-        cmds.connectAttr('{}.outputY'.format(wideMult), "{}.input3D[1].input3Dy".format(wideSum))
 
-        cmds.connectAttr("{}.positionZ".format(widePoc), '{}.tz'.format(wideJnt))
+        if wideJnt.startswith('l_'):
+            cmds.connectAttr("lidFactor.lidRotateY_scale", '{}.input2X'.format(wideMult))
+            cmds.connectAttr("{}.positionZ".format(widePoc), '{}.tz'.format(wideJnt))
+
+        else:
+            cmds.connectAttr("{}.outputX".format(reverseMult), '{}.input2X'.format(wideMult))
+            cmds.connectAttr("{}.positionZ".format(widePoc), '{}.input1Z'.format(wideMult))
+            cmds.setAttr('{}.input2Z'.format(wideMult), -1)
+            cmds.connectAttr('{}.outputZ'.format(wideMult), '{}.tz'.format(wideJnt))
 
     def lidBlendShape(self, ctlCrv, targetList):
 
@@ -514,12 +521,12 @@ class EyeRig(face_utils.Util):
                 polyCrv = self.polyCrvDict[LR + upLow]
                 tempGuideCrv = cmds.duplicate(polyCrv, n="{}{}tempGuide_crv".format(LR, upLow), rc=1)[0]
                 cmds.rebuildCurve(tempGuideCrv, rebuildType=0, spans=numOfCtl - 1, keepRange=0, degree=3)
-                tempGuideCrvSahpe = cmds.listRelatives(tempGuideCrv, c=1)[0]
+                tempGuideCrvShp = cmds.listRelatives(tempGuideCrv, c=1)[0]
                 parameters = []
                 tempParam = 1.0/(numOfCtl-1)
                 for i in range(numOfCtl):
 
-                    tempPoc = self.createPocNode("tempPoc{}".format(str(i+1)), tempGuideCrvSahpe, tempParam * i)
+                    tempPoc = self.createPocNode("tempPoc{}".format(str(i+1)), tempGuideCrvShp, tempParam * i)
                     position = cmds.getAttr("{}.position".format(tempPoc))[0]
                     param = self.getUParam(pntPos=position, crv=polyCrv)
                     parameters.append(param)
@@ -543,6 +550,7 @@ class EyeRig(face_utils.Util):
 
                     index += 1
                     name = self.namingMethod(LR, upLow, "Eye", str(index).zfill(2), "ctl")
+                    #create Mid Ctl
                     ctlChain = self.createMidController(name, dist[1] / 50.0, myCtl, param=prm, guideCrv=polyCrv,
                                                         colorID=colorID)
                     ctl, offset, null, poc = [ctlChain[0], ctlChain[1], ctlChain[2], ctlChain[3]]
@@ -550,9 +558,11 @@ class EyeRig(face_utils.Util):
                     cmds.setAttr("{}.sx".format(offset), val)
 
                     if prm == centerParam:
+                        # create Broad Ctl
                         broadCtl = self.genericController("{}{}CenterCtl".format(LR, upLow), (0, 0, 0), dist[1] / 150.0,
                                                           "circle", self.ctlColor["pink"])
                         centerCtl, offCtl = face_utils.addOffset(broadCtl)
+                        broadMult = cmds.shadingNode("multiplyDivide", asUtility=1, n="{}_mult".format(centerCtl))
                         #cmds.connectAttr("{}.position".format(poc), "{}.t".format(offCtl))
                         ctlJnt = "{}{}CenterCtl_jnt".format(LR, upLow)
                         cmds.parent(offCtl, null)
@@ -560,8 +570,18 @@ class EyeRig(face_utils.Util):
                         cmds.setAttr(offCtl + ".ty", 0)
                         cmds.setAttr(offCtl + ".tz", offSetVal*2)
                         cmds.setAttr("{}.sx".format(offCtl), val)
-                        cmds.connectAttr("{}.t".format(centerCtl), "{}.t".format(ctlJnt))
-                        cmds.connectAttr("{}.r".format(centerCtl), "{}.r".format(ctlJnt))
+                        if centerCtl.startswith('l_'):
+                            cmds.connectAttr("{}.t".format(centerCtl), "{}.t".format(ctlJnt))
+                        else:
+                            cmds.connectAttr("{}.tx".format(centerCtl), "{}.input1X".format(broadMult))
+                            cmds.setAttr("{}.input2X".format(broadMult), val)
+                            cmds.connectAttr("{}.outputX".format(broadMult), "{}.tx".format(ctlJnt))
+                            cmds.connectAttr("{}.ty".format(centerCtl), "{}.ty".format(ctlJnt))
+                            cmds.connectAttr("{}.tz".format(centerCtl), "{}.tz".format(ctlJnt))
+
+                        cmds.connectAttr("{}.rz".format(centerCtl), "{}.input1Y".format(broadMult))
+                        cmds.setAttr("{}.input2Y".format(broadMult), val)
+                        cmds.connectAttr("{}.outputY".format(broadMult), "{}.rotateZ".format(ctlJnt))
 
                     self.eyeCtlToCvs(ctl, CTLCrvCvs[LR + upLow][index], rollCvs[LR + upLow][index],
                                      puffCvs[LR + upLow][index])
@@ -575,7 +595,7 @@ class EyeRig(face_utils.Util):
             colorIndex = self.ctlColor["pink"]
             cornerCtlDict = {"inCorner": 0, "outCorner": numOfCtl-1}
             for position, value in cornerCtlDict.items():
-
+                # create Mid Ctl
                 name = self.namingMethod(LR, "", "lid", position, "ctl")
                 ctlChain = self.createMidController(name, dist[1] / 50.0, myCtl, param=parameters[value],
                                                     guideCrv=polyCrv, colorID=colorIndex)
@@ -595,8 +615,19 @@ class EyeRig(face_utils.Util):
                 #cmds.connectAttr("{}.position".format(poc), "{}.t".format(offCtl))
                 # broad Ctl connections
                 ctlJnt = "{}{}Ctl_jnt".format(LR, position)
-                cmds.connectAttr("{}.t".format(cornerCtl), "{}.t".format(ctlJnt))
-                cmds.connectAttr("{}.r".format(cornerCtl), "{}.r".format(ctlJnt))
+                broadMult = cmds.shadingNode("multiplyDivide", asUtility=1, n="{}_mult".format(cornerCtl))
+                if cornerCtl.startswith('l_'):
+                    cmds.connectAttr("{}.t".format(cornerCtl), "{}.t".format(ctlJnt))
+                else:
+                    cmds.connectAttr("{}.tx".format(cornerCtl), "{}.input1X".format(broadMult))
+                    cmds.setAttr("{}.input2X".format(broadMult), val)
+                    cmds.connectAttr("{}.outputX".format(broadMult), "{}.tx".format(ctlJnt))
+                    cmds.connectAttr("{}.ty".format(cornerCtl), "{}.ty".format(ctlJnt))
+                    cmds.connectAttr("{}.tz".format(cornerCtl), "{}.tz".format(ctlJnt))
+
+                cmds.connectAttr("{}.rz".format(cornerCtl), "{}.input1Y".format(broadMult))
+                cmds.setAttr("{}.input2Y".format(broadMult), val)
+                cmds.connectAttr("{}.outputY".format(broadMult), "{}.rz".format(ctlJnt))
 
                 cmds.parent(null, lidCtlGrp)
 
@@ -612,9 +643,18 @@ class EyeRig(face_utils.Util):
     def eyeCtlToCvs(self, ctl, ctlCv, rollCv, puffCv):
 
         addCtlDouble = cmds.shadingNode('addDoubleLinear', asUtility=True, n=ctl.replace("ctl", "add"))
+        multDouble = cmds.shadingNode('multDoubleLinear', asUtility=True, n=ctl.replace("ctl", "mult"))
         ctlTx = cmds.getAttr("{}.xValue".format(ctlCv))
         cmds.setAttr("{}.input2".format(addCtlDouble), ctlTx)
-        cmds.connectAttr("{}.tx".format(ctl), "{}.input1".format(addCtlDouble))
+
+        if ctl.startswith('l_'):
+            cmds.connectAttr("{}.tx".format(ctl), "{}.input1".format(addCtlDouble))
+
+        else:
+            cmds.connectAttr("{}.tx".format(ctl), '{}.input1'.format(multDouble))
+            cmds.setAttr('{}.input2'.format(multDouble), -1)
+            cmds.connectAttr('{}.output'.format(multDouble), "{}.input1".format(addCtlDouble))
+
         cmds.connectAttr("{}.output".format(addCtlDouble), "{}.xValue".format(ctlCv))
         cmds.connectAttr("{}.ty".format(ctl), "{}.yValue".format(ctlCv))
         cmds.connectAttr("{}.tz".format(ctl), "{}.zValue".format(ctlCv))
@@ -623,3 +663,82 @@ class EyeRig(face_utils.Util):
 
         cmds.connectAttr("{}.sy".format(ctl), "{}.yValue".format(puffCv))
         cmds.connectAttr("{}.sz".format(ctl), "{}.zValue".format(puffCv))
+
+def createEyeRig():
+    if not cmds.objExists("eyeRigP"):
+        eyeRigP = cmds.group(em=True, n="eyeRigP", p="eyeRig")
+
+    if not cmds.objExists('eyeTR'):
+        eyeRigTR = cmds.group(em=True, n='eyeTR', p='eyeRigP')
+
+    else:
+        eyeRigTR = "eyeTR"
+        if not "eyeRigP" in cmds.listRelatives(eyeRigTR, p=1):
+            cmds.parent(eyeRigTR, "eyeRigP")
+
+    headSkel = cmds.listRelatives("eyeRig", p=1)[0]
+
+    for LR in ["l_", "r_"]:
+        if cmds.objExists(LR + 'eyeP'):
+            cmds.confirmDialog(title='Confirm', message='the EyeRig already created')
+        else:
+            EyePos = cmds.xform('lEyePos', t=True, q=True, ws=True)
+            EyeRot = cmds.xform('lEyePos', ro=True, q=True, ws=True)
+            if LR == "r_":
+                EyePos = [-EyePos[0], EyePos[1], EyePos[2]]
+                EyeRot = [EyeRot[0], -EyeRot[1], EyeRot[2]]
+
+            DMat = cmds.shadingNode('decomposeMatrix', asUtility=1, n=LR + 'EyeDMat')
+            inverseDMat = cmds.shadingNode('decomposeMatrix', asUtility=1, n=LR + 'inverseDMat')
+            # ffdSquachLattice = cmds.group(em =1, n = 'ffdSquachLattice', p = 'eyeRigP')
+            EyeP = cmds.group(em=True, n=LR + 'eyeP', p=eyeRigTR)
+            cmds.xform(EyeP, ws=1, t=(EyePos[0], EyePos[1], EyePos[2]))
+            EyeRP = cmds.group(em=True, n=LR + 'eyeRP', p=EyeP)
+            cmds.setAttr(EyeRP + ".ry", EyeRot[1])
+            cmds.setAttr(EyeRP + ".rx", EyeRot[0])
+            EyeScl = cmds.group(em=True, n=LR + 'eyeScl', p=EyeRP)
+            # squachSetup.indieScaleSquach( EyeScl, "y" )
+            EyeRot = cmds.group(em=True, n=LR + 'eyeRot', p=EyeScl)
+            EyeballRot = cmds.group(em=True, n=LR + 'eyeballRot', p=EyeRot)
+            # EyeBallRot worldMatrix - HeadSkel.worldMatrix --> eyeDecompose
+            cmds.connectAttr(headSkel + ".worldInverseMatrix", inverseDMat + ".inputMatrix")
+            cmds.connectAttr(EyeballRot + ".worldMatrix", DMat + ".inputMatrix")
+
+            # under headTRS
+            decomNullP = cmds.group(em=1, n=LR + "eyeDecomposeP", p="supportRig")
+            decomNull = cmds.group(em=1, n=LR + "eyeDecompose", p=decomNullP)
+            eyeBallTran = cmds.group(em=1, n=LR + "eyeTransform", p=decomNull)
+            cmds.xform(decomNullP, ws=1, t=(EyePos[0], EyePos[1], EyePos[2]))
+            # connect inverseDMat
+            cmds.connectAttr(inverseDMat + ".outputTranslate", decomNullP + ".t")
+            cmds.connectAttr(inverseDMat + ".outputRotate", decomNullP + ".r")
+            cmds.connectAttr(inverseDMat + ".outputScale", decomNullP + ".s")
+            cmds.connectAttr(inverseDMat + ".outputShear", decomNullP + ".shear")
+
+            cmds.connectAttr(DMat + ".outputTranslate", decomNull + ".t")
+            cmds.connectAttr(DMat + ".outputRotate", decomNull + ".r")
+            cmds.connectAttr(DMat + ".outputScale", decomNull + ".s")
+            cmds.connectAttr(DMat + ".outputShear", decomNull + ".shear")
+
+            ctl = LR + "eyeDir_ctl"
+            if cmds.objExists(ctl):
+                mult = cmds.shadingNode("multiplyDivide", asUtility=1, n=LR + "eyeBall_mult")
+                cmds.connectAttr(ctl + ".tx", mult + ".input1X")
+                cmds.connectAttr(ctl + ".ty", mult + ".input1Y")
+                cmds.connectAttr("lidFactor.eyeBallRotY_scale", mult + ".input2X")
+                cmds.connectAttr("lidFactor.eyeBallRotX_scale", mult + ".input2Y")
+                cmds.connectAttr(mult + ".outputX", EyeballRot + ".ry")
+                cmds.connectAttr(mult + ".outputY", EyeballRot + ".rx")
+            else:
+                cmds.confirmDialog(title='Confirm', message='import "shape panel" first')
+
+
+def eyeWideCanceling_browUpWIP():
+
+    #Connected lidFactor.eyeWide_followUp to r_lidWide_cancelMult.input1.input1Y.
+
+    multList = cmds.listConnections('l_lidWide_cancelMult.outputY', s=0, d=1)
+    rMultList = [ x for x in multList if 'r_' in x]
+    for mult in rMultList:
+        cmds.connectAttr( 'r_lidWide_cancelMult.outputY', '{}.input2X'.format(mult), f=1)
+

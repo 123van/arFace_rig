@@ -8,13 +8,13 @@ from maya import OpenMaya
 from twitchScript.face import face_utils
 reload(face_utils)
 
-def faceClsMirrorWgt(targetCls, option):
+def faceClsMirrorWgt(targetCls, option, direction):
 
     headGeo = cmds.getAttr("helpPanel_grp.headGeo")
     pairCls = ["eyeWide_cls", "eyeBlink_cls", "squintPuff_cls", "cheek_cls", "lowCheek_cls", "ear_cls"]
 
     singleCls = ['jawOpen_cls', 'jawClose_cls', 'mouth_cls', 'lip_cls', 'lipRoll_cls', 'browUp_cls', 'browDn_cls',
-                 'browTZ_cls', 'nose_cls', 'upLipRoll_cls', 'bttmLipRoll_cls', 'jawFat_cls', 'chin_cls']
+                 'browTZ_cls', 'nose_cls', 'lipRoll_cls', 'bttmLipRoll_cls', 'jawFat_cls', 'chin_cls']
 
     if option == "all":
         # pair clusters( blink, cheek...) weight mirror
@@ -33,12 +33,21 @@ def faceClsMirrorWgt(targetCls, option):
 
     else:
         if targetCls in pairCls:
-            lCluster = "l_{}".format(targetCls)
-            rCluster = "r_{}".format(targetCls)
-            if cmds.objExists(lCluster) and cmds.objExists(rCluster):
-                cmds.copyDeformerWeights(sd=lCluster, ss=headGeo, ds=headGeo, dd=rCluster, mirrorMode="YZ",
-                                         surfaceAssociation="closestPoint")
-                print("{} weight mirrored to {}".format(lCluster, rCluster))
+            print(direction)
+            if direction == 1:
+                srcCls = "l_{}".format(targetCls)
+                destCls = "r_{}".format(targetCls)
+                if cmds.objExists(srcCls) and cmds.objExists(destCls):
+                    cmds.copyDeformerWeights(sd=srcCls, ss=headGeo, ds=headGeo, dd=destCls, mirrorMode="YZ",
+                                             surfaceAssociation="closestPoint")
+                print('{} wgt mirrored to {} wgt'.format(srcCls, destCls))
+            else:
+                srcCls = "r_{}".format(targetCls)
+                destCls = "l_{}".format(targetCls)
+                if cmds.objExists(srcCls) and cmds.objExists(destCls):
+                    cmds.copyDeformerWeights(sd=srcCls, ss=headGeo, ds=headGeo, dd=destCls, mirrorMode="YZ", mi=1,
+                                             surfaceAssociation="closestPoint")
+                print('{} wgt mirrored to {} wgt'.format(srcCls, destCls))
 
         else:
             # single cluster( nose, brow...) weight mirror
@@ -46,7 +55,6 @@ def faceClsMirrorWgt(targetCls, option):
                 cmds.copyDeformerWeights(sd=targetCls, ss=headGeo, ds=headGeo, mirrorMode="YZ",
                                          surfaceAssociation="closestPoint")
 
-                print("{} weight mirrored".format(targetCls))
 
 def loftFacePart(factor, facePart, crvList):
     """
@@ -143,7 +151,7 @@ def createVtxSet(selectedCluster):
         face_utils.addAttrStoreData("helpPanel_grp", "{}_set".format(selectedCluster), "string", selectVtxSet,
                                     "string")
 
-    wideClsDict = {"browUp_cls": "browTZ_cls", "eyeWide_cls": "eyeBlink_cls", "lip_cls": "upLipRoll_cls"}
+    wideClsDict = {"browUp_cls": "browTZ_cls", "eyeWide_cls": "eyeBlink_cls", "lip_cls": "lipRoll_cls"}
     wideClsList = sorted(wideClsDict.keys())
 
     if selectedCluster in wideClsList:
@@ -218,7 +226,7 @@ class FaceSkin(face_utils.Util):
         self.geo = None
         self.size = None
         self.lipWgt = []
-        self.upRollWgt = []
+        self.lipRollWgt = []
         self.jawOpenWgt = []
         self.chinWgt = []
         self.browUpWgt = []
@@ -236,7 +244,7 @@ class FaceSkin(face_utils.Util):
         # add jawFat_cls, chin_cls (11_16_2023)
         helpCluster = {'rotXPivot': ['browUp_cls', 'browDn_cls'], 'rotYPivot': ['browTZ_cls'],
                        'lEyePos': ['eyeWide_cls', 'eyeBlink_cls'], 'jawRigPos': ['jawOpen_cls', 'jawClose_cls'],
-                       'lipYPos': ['lip_cls'], 'lipNPos': ['upLipRoll_cls'], 'lipSPos': ['bttmLipRoll_cls']}
+                       'lipYPos': ['lip_cls'], 'lipNPos': ['lipRoll_cls'], 'lipSPos': ['bttmLipRoll_cls']}
 
         for cls in helpCluster.values():
             self.helpClsList += cls
@@ -403,6 +411,10 @@ class FaceSkin(face_utils.Util):
         if not cmds.objExists(surfMap):
             raise RuntimeError("create {} surface map first!!".format(facePart))
 
+        surfMapSkin = mel.eval('findRelatedSkinCluster {}'.format(surfMap))
+        if surfMapSkin:
+            raise RuntimeError('{} already has SkinCluster'.format(surfMap))
+
         vtxLen = cmds.polyEvaluate(surfMap, v=1)
 
         orderJnt = orderedJnt
@@ -447,11 +459,11 @@ class FaceSkin(face_utils.Util):
         self.browJnt = cmds.listRelatives(cmds.listRelatives(self.browRYJnt, c=1), c=1)
         # brow lower part
         for jot in self.browRYJnt:
-            upJnt = jot.replace("browRY", "upBrowWideRY")
+            upJnt = jot.replace("browRY", "up_browWideRY")
             if cmds.objExists(upJnt):
                 self.upBrowWide.append(upJnt)
 
-            loJnt = jot.replace("browRY", "loBrowWideRY")
+            loJnt = jot.replace("browRY", "lo_browWideRY")
             if cmds.objExists(loJnt):
                 self.loBrowWide.append(loJnt)
 
@@ -556,7 +568,7 @@ class FaceSkin(face_utils.Util):
                 if scCls == "browUp_cls" and ddCls == "browDn_cls":
                     self.assignBrowClsWgt()
 
-                elif scCls == "upLipRoll_cls" and ddCls == "bttmLipRoll_cls":
+                elif scCls == "lipRoll_cls" and ddCls == "bttmLipRoll_cls":
                     self.assginBttmLipRollWgt()
 
                 else:
@@ -584,6 +596,7 @@ class FaceSkin(face_utils.Util):
         if not cmds.objExists(browDnClsSet):
             raise RuntimeError("create browDn_cls set first!!")
 
+        self.size = cmds.polyEvaluate(self.geo, v=1)
         browDnSet = cmds.sets(browDnClsSet, q=1)
         browDnVtx = cmds.ls(browDnSet, fl=1)
         browUpWgt = cmds.getAttr("browUp_cls.wl[0].w[0:" + str(self.size - 1) + "]")
@@ -605,8 +618,8 @@ class FaceSkin(face_utils.Util):
 
     def assginBttmLipRollWgt(self):
 
-        if not cmds.attributeQuery("upLipRoll_cls_set", node="helpPanel_grp", exists=1):
-            raise RuntimeError("create upLipRoll_cls_set first!!")
+        if not cmds.attributeQuery("lipRoll_cls_set", node="helpPanel_grp", exists=1):
+            raise RuntimeError("create lipRoll_cls_set first!!")
 
         loLipVerts = cmds.getAttr("lipFactor.loLipVerts")
         length = len(loLipVerts)
@@ -616,16 +629,12 @@ class FaceSkin(face_utils.Util):
             mel.eval('PolySelectTraverse 1')
 
         loLipVtxList = cmds.ls(sl=1, fl=1)
+        for vtx in loLipVtxList:
+            ID = vtx.split('[')[1][:-1]
+            lipRollVal = cmds.getAttr('lipRoll_cls.weightList[0].weights[{}]'.format(ID))
+            cmds.setAttr('bttmLipRoll_cls.weightList[0].weights[{}]'.format(ID), lipRollVal)
 
-        bttmLipVtx = []
-        for i in range(self.size):
-
-            vtx = "{}.vtx[{}]".format(self.geo, str(i))
-            if vtx in loLipVtxList:
-
-                bttmLipVtx.append(vtx)
-
-        cmds.select(bttmLipVtx, r=1)
+        cmds.select(loLipVtxList, r=1)
         createVtxSet("bttmLipRoll_cls")
 
     def copySkinWeight(self, surfMap, mapHead):
@@ -666,7 +675,7 @@ class FaceSkin(face_utils.Util):
 
         for x, y in tempHeadMap.iteritems():
             if cmds.objExists(y[0]) and cmds.objExists(y[1]):
-                copySkinWeightInClsVerts(x, y[1], y[0], y[2])
+                self.copySkinWeightInClsVerts(x, y[1], y[0], y[2])
                 # cmds.deformerWeights ( y[2]+'.xml', export =1, deformer=y[2], path= trioWgtPath )
                 # cmds.skinPercent( y[2], y[1]+'.vtx[0:%s]'%(vertNum-1), tv = ['headSkel_jnt',1] )
             else:
@@ -746,14 +755,14 @@ class FaceSkin(face_utils.Util):
             self.helpClsList = cmds.getAttr("helpPanel_grp.helperCluster")
 
         for cls in self.helpClsList:
-
-            if not cmds.objExists(cls):
-                raise RuntimeError('{} is missing'.format(cls))
+            pass
+            # if not cmds.objExists(cls):
+            #     raise RuntimeError('{} is missing'.format(cls))
 
         self.geo = cmds.getAttr("helpPanel_grp.headGeo")
         size = cmds.polyEvaluate(self.geo, v=1)
         self.lipWgt = cmds.getAttr("lip_cls.wl[0].w[0:" + str(size - 1) + "]")
-        self.upRollWgt = cmds.getAttr("upLipRoll_cls.wl[0].w[0:" + str(size - 1) + "]")
+        self.lipRollWgt = cmds.getAttr("lipRoll_cls.wl[0].w[0:" + str(size - 1) + "]")
         self.bttmRollWgt = cmds.getAttr("bttmLipRoll_cls.wl[0].w[0:" + str(size - 1) + "]")
         self.jawOpenWgt = cmds.getAttr("jawOpen_cls.wl[0].w[0:" + str(size - 1) + "]")
         self.chinWgt = cmds.getAttr("chin_cls.wl[0].w[0:" + str(size - 1) + "]")
@@ -763,8 +772,11 @@ class FaceSkin(face_utils.Util):
         self.eyeWideWgt = cmds.getAttr("eyeWide_cls.wl[0].w[0:" + str(size - 1) + "]")
         self.eyeBlinkWgt = cmds.getAttr("eyeBlink_cls.wl[0].w[0:" + str(size - 1) + "]")
 
-        clsWgtList = [self.lipWgt, self.upRollWgt, self.bttmRollWgt, self.jawOpenWgt, self.chinWgt, self.browUpWgt,
+        clsWgtList = [self.lipWgt, self.lipRollWgt, self.bttmRollWgt, self.jawOpenWgt, self.chinWgt, self.browUpWgt,
                       self.browDnWgt, self.browTZWgt, self.eyeWideWgt, self.eyeBlinkWgt]
+
+        if max(self.browDnWgt) == 0.0:
+            self.assignBrowClsWgt()
 
         for wgtList in clsWgtList:
             maxWgt = max(wgtList)
@@ -812,13 +824,13 @@ class FaceSkin(face_utils.Util):
                 cmds.setAttr("eyeBlink_cls.wl[0].w[%s]" % str(i), self.eyeWideWgt[i])
                 self.eyeBlinkWgt[i] = self.eyeWideWgt[i]
 
-            lipRollVtxVal = self.upRollWgt[i] - self.bttmRollWgt[i]
+            lipRollVtxVal = self.lipRollWgt[i] - self.bttmRollWgt[i]
             if lipRollVtxVal < 0:
-                self.upRollWgt[i] = self.bttmRollWgt[i]
+                self.lipRollWgt[i] = self.bttmRollWgt[i]
 
-            lipVtxVal = self.lipWgt[i] - self.upRollWgt[i]
+            lipVtxVal = self.lipWgt[i] - self.lipRollWgt[i]
             if lipVtxVal < 0:
-                self.upRollWgt[i] = self.lipWgt[i]
+                self.lipRollWgt[i] = self.lipWgt[i]
 
             # to create gradient jawClose map / filter out lip area by multiple (1 - mouth)
             # jaw open * inverse_lipWgt (= inverse black&white image)
@@ -827,7 +839,7 @@ class FaceSkin(face_utils.Util):
         cmds.setAttr("browUp_cls.wl[0].w[0:{}]".format(str(size - 1)), *self.browUpWgt, s=size)
         cmds.setAttr("browTZ_cls.wl[0].w[0:{}]".format(str(size - 1)), *self.browTZWgt, s=size)
         cmds.setAttr("browDn_cls.wl[0].w[0:{}]".format(str(size - 1)), *self.browDnWgt, s=size)
-        cmds.setAttr("upLipRoll_cls.wl[0].w[0:{}]".format(str(size - 1)), *self.upRollWgt, s=size)
+        cmds.setAttr("lipRoll_cls.wl[0].w[0:{}]".format(str(size - 1)), *self.lipRollWgt, s=size)
 
         self.jcValStr = ''
         mouthValStr = ''
@@ -843,7 +855,7 @@ class FaceSkin(face_utils.Util):
         mel.eval(jcCmmdStr)
 
     #partial command
-    def cleanUpBrowEyeOverlap(self, browDn, index):
+    def cleanUpBrowEyeOverlap(self, browDnWeight, index):
         """
         fix brow & eyeLid overlap weight value
         Args:
@@ -854,7 +866,7 @@ class FaceSkin(face_utils.Util):
 
         """
 
-        if browDn:
+        if browDnWeight:
 
             # self.browUpWgt[index] -= self.browDnWgt[index]
             #
@@ -960,11 +972,11 @@ class FaceSkin(face_utils.Util):
                         wgtVal = float(point.attrib['value'])
 
                         cmds.setAttr("{}.wl[{}].w[{}]".format(skinCls, str(vtxIndex), str(rollJntID)),
-                                     self.upRollWgt[vtxIndex] * wgtVal)
+                                     self.lipRollWgt[vtxIndex] * wgtVal)
 
                         # if vertNum in lipVertNum:
                         cmds.setAttr("{}.wl[{}].w[{}]".format(skinCls, str(vtxIndex), str(lipYJntID)),
-                                     (self.lipWgt[vtxIndex] - self.upRollWgt[vtxIndex]) * wgtVal)
+                                     (self.lipWgt[vtxIndex] - self.lipRollWgt[vtxIndex]) * wgtVal)
 
         else:
             print("%s.xml(lipWeight file) does not exists" % skinCls)
@@ -1006,12 +1018,12 @@ class FaceSkin(face_utils.Util):
                 if browJnt in browJnts:
                     print(browJnt)
                     rotYJnt = browJnt.replace("brow_", "browRY_")
-                    upWideJnt = rotYJnt.replace("browRY", "upBrowWideRY")
-                    loWideJnt = rotYJnt.replace("browRY", "loBrowWideRY")
+                    upWideJnt = rotYJnt.replace("browRY", "up_browWideRY")
+                    loWideJnt = rotYJnt.replace("browRY", "lo_browWideRY")
                     rotYJntID = face_utils.getJointIndex(skinCls, rotYJnt)
                     childJntID = face_utils.getJointIndex(skinCls, browJnt)
                     loWideID = face_utils.getJointIndex(skinCls, loWideJnt)
-
+                    print('{} ID is {} and weightValue is browDnWgt'.format(loWideJnt, loWideID))
                     if cmds.objExists(upWideJnt):
                         upWideID = face_utils.getJointIndex(skinCls, upWideJnt)
 
@@ -1050,6 +1062,5 @@ class FaceSkin(face_utils.Util):
         self.calExtraClsWgt()
         deformerNodeStateOnOff(self.geo, "off")
         self.faceWeightCalculate()
-
 
 
