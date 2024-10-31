@@ -46,6 +46,7 @@ check if browMapHead has right skinWeight map
 ## curve shape 중 "squint","annoy"는 위아래 눈꺼플이 오버랩되지 않도록한다. blink를 망칠수 있다.(스크립트를 수정하자) 
 """
 
+
 def invertWeight():
     myGeo = cmds.ls(sl=1, type='transform')
     vtxLen = cmds.polyEvaluate(myGeo, v=1)
@@ -124,11 +125,10 @@ class BlendShapeFunc(face_utils.Util):
             print('use twitchBS method')
 
 
-
     def bakeWeight_toCorrective(self, wgtDeformer, wgtSourceTarget, sculptedGeo):
         """
         1. sculptedGeo 를 baseGeo 블렌쉐입에 add (delta only)
-        2.
+        2. if twitch has a sculptedGeo as target, then it rebuild the target
         wgtDeformer = mapSkinCluster / splitMap / cluster...on Geo that has same vtx order as headGeo
         wgtSourceTarget = weighted obj list ( joints, shapes....)
         select sculpted geo and headGeo
@@ -137,21 +137,16 @@ class BlendShapeFunc(face_utils.Util):
 
         # add blendShape target
         BS_nodes = [x for x in cmds.listHistory(self.headGeo, pdo=1) if cmds.nodeType(x) == 'blendShape']
-        if not self.bsList:
-            self.bsList = cmds.ls("*LipCrvBS", "*browBS", "*Shape_BS", "*HiCrv_BS", "*twitchBS")
 
-        self.bsNode = [bs for bs in BS_nodes if bs in self.bsList][0]
+        self.bsNode = [ y for y in BS_nodes if not y == 'splitMapBS']
         aliasBS = cmds.aliasAttr(self.bsNode, q=1)
-        numList = []
-        for tgt, wgt in zip(*[iter(aliasBS)] * 2):
-            num = int(wgt.split('[')[1][:-1])
-            numList.append(num)
+        baseTargetID = self.get_targetIndex( self.bsNode, sculptedGeo)
 
-        numList.sort()
+        if sculptedGeo in aliasBS:
+            baseTargetID = wgtID + 1
 
-        baseTargetID = numList[-1] + 1
-
-        if sculptedGeo not in aliasBS:
+        else:
+            baseTargetID = wgtIDList[-1] + 1
             temp_target = cmds.duplicate(self.headGeo, rc=1, n="temp_{}".format(sculptedGeo))[0]
             cmds.blendShape(self.bsNode, e=1, tc=1, t=(self.headGeo, baseTargetID, temp_target, 1))
             cmds.blendShape(self.bsNode, e=True, resetTargetDelta=(0, baseTargetID))
@@ -164,7 +159,7 @@ class BlendShapeFunc(face_utils.Util):
         baseIndex = self.get_targetIndex(self.bsNode, sculptedGeo)
         comp = cmds.getAttr('twitchBS.it[0].itg[{}].iti[6000].inputComponentsTarget'.format(str(baseIndex)))
         delta = cmds.getAttr('twitchBS.it[0].itg[{}].iti[6000].inputPointsTarget'.format(str(baseIndex)))
-
+        print (comp, baseIndex, wgtSourceTarget)
         self.deformerType = cmds.nodeType(wgtDeformer)
 
         for index, weightSrcName in enumerate(wgtSourceTarget):
@@ -254,6 +249,7 @@ class BlendShapeFunc(face_utils.Util):
         select sculpted geo and headGeo
         """
         self.headGeo = cmds.getAttr('helpPanel_grp.headGeo')
+
         mapSkin = mel.eval('findRelatedSkinCluster {}'.format(mapSkinHead))
         facePart = mapSkinHead.split('Map')[0]
         if facePart == 'brow':
@@ -270,20 +266,22 @@ class BlendShapeFunc(face_utils.Util):
         if not self.bsList:
             self.bsList = cmds.ls("*LipCrvBS", "*browBS", "*Shape_BS", "*HiCrv_BS", "*twitchBS")
 
-        #create corrective shape in
+        #create corrective shape in self.bsNode
         self.bsNode = [bs for bs in BS_nodes if bs in self.bsList][0]
+
+        #get alias attributes and target index
         aliasBS = cmds.aliasAttr(self.bsNode, q=1)
         target_index = cmds.blendShape(self.bsNode, q=1, wc=1)
 
         if sculptedGeo not in aliasBS:
 
-            temp_target = cmds.duplicate(self.headGeo, rc="temp_{}".format(sculptedGeo))[0]
-            cmds.blendShape(self.bsNode, e=1, tc=1, t=(self.headGeo, target_index, temp_target, 1))
+            corrective_target = cmds.duplicate(self.headGeo, rc="temp_{}".format(sculptedGeo))[0]
+            cmds.blendShape(self.bsNode, e=1, tc=1, t=(self.headGeo, target_index, corrective_target, 1))
             cmds.blendShape(self.bsNode, e=True, resetTargetDelta=(0, target_index))
             cmds.blendShape(self.bsNode, e=1, weight=(target_index, 1.0))
             cmds.sculptTarget(self.bsNode, e=1, target=target_index)
-            cmds.delete(temp_target)
-            print('{} index number is {}'.format(self.bsNode + sculptedGeo, target_index))
+            cmds.delete(corrective_target)
+            print('{} index number is {}'.format(sculptedGeo, target_index))
             cmds.select(sculptedGeo, self.headGeo, r=1)
             mel.eval("copyShape")
 
@@ -300,10 +298,10 @@ class BlendShapeFunc(face_utils.Util):
             nameSplit=jnt.split('_')
             new_alias = '{}_{}_{}'.format(nameSplit[0], sculptedGeo, nameSplit[2])
             tgtIndex = cmds.blendShape(self.bsNode, q=1, wc=1)
-            temp_target = cmds.duplicate(self.headGeo, rc=1, n=new_alias)[0]
+            corrective_target = cmds.duplicate(self.headGeo, rc=1, n=new_alias)[0]
             print(tgtIndex, new_alias)
-            cmds.blendShape(self.bsNode, e=1, tc=1, t=(self.headGeo, tgtIndex, temp_target, 1))
-            cmds.delete(temp_target)
+            cmds.blendShape(self.bsNode, e=1, tc=1, t=(self.headGeo, tgtIndex, corrective_target, 1))
+            cmds.delete(corrective_target)
             cmds.blendShape(self.bsNode, e=True, resetTargetDelta=(0, tgtIndex))
             #cmds.aliasAttr(new_alias, '{}.w[{}]'.format(self.bsNode, tgtIndex ))
 
@@ -324,7 +322,7 @@ class BlendShapeFunc(face_utils.Util):
 
         cmds.blendShape(self.bsNode, e=1, weight=(int(sourceIndex), 0.0))
 
-    def weightTransfer(self, srcGeo, srcDform, srcWgtTarget, destGeo, destDform, destWgtTarget):
+    def weightTransfer(self, srcGeo, srcDform, srcWgtTarget, destGeo, destDform, destWgtTarget, invertWgt=0):
 
         srcType = cmds.nodeType(srcDform)
         destType = cmds.nodeType(destDform)
@@ -352,8 +350,11 @@ class BlendShapeFunc(face_utils.Util):
         else:
             print("working on it!!")
 
-        print(weightVal)
-        #transfer weightVals to the other deformer
+        print('{} number of weight is same as {} vertex number'.format(len(weightVal), cmds.polyEvaluate(destGeo, v=1)))
+        if invertWgt:
+            weightVal = [ (1-wgt) for wgt in weightVal ]
+
+        #transfer weightVals to the destination deformer
         if destType == 'cluster':
 
             geoIndex = face_utils.geoID_cluster(destGeo, destDform)
@@ -366,15 +367,24 @@ class BlendShapeFunc(face_utils.Util):
             cmds.setAttr('{}.it[0].itg[{}].tw[0:{}]'.format(destDform, str(tgtIndex), str(vtxNum - 1)), *weightVal)
 
     def get_targetIndex(self, bsNode, target):
+        '''
+        returns new target index if target is not in bsNode
+        returns existing target index if target is in bsNode
+        '''
 
         aliasList = cmds.aliasAttr(bsNode, q=1)
+        wgtList =[]
         for tgt, wgt in zip(*[iter(aliasList)] * 2):
             if tgt == target:
-                tgtID = int(wgt.split("[")[1][:-1])
+                tgtID = re.findall('\d+', wgt)[0]
                 break
 
+            else:
+                wgtID = re.findall('\d+', wgt)[0]
+                wgtList.append(int(wgtID))
+
         else:
-            tgtID = []
+            tgtID = max(wgtList) + 1
 
         return tgtID
 
@@ -1331,7 +1341,6 @@ def ctrlPlusMinus_connect(  ctrl, xyz, plusDict, minusDict, *args ):
         cmds.connectAttr( ctlClamp + '.outputG', minus )
 
 
-                
 #brow 타겟(코렉티브 쉐입이 아니다)을 하나씩 선택한 후 twitchPanel의 ctl들로 타겟과 근접한 포즈를 잡고 실행한다.[이름 중요 "browUp","browDown", "browIn","browOut"] 
 #꼭 필요한 경우에만 만든다. 대부분 browIn/Out만 해도 충분.     
 # posMax(10) : browJnt.rx -10일때 twitchBS.browUp reaches to max(1)    
@@ -1446,14 +1455,9 @@ def createBrowCorrective( posMax, negMax, inMax, outMax ):
                 cmds.connectAttr( "r_brow01_%s.outValue"%map, addD + ".input2")
                 cmds.connectAttr( addD + ".output", "c_brow01_%s.inputValue"%map, f=1 )            
             
-#createBrowCorrective( 20, 18, 10, 10 )            
-            
+#createBrowCorrective( 20, 18, 10, 10 )
 
-
-
-
-
-def updateRemapMax(posMax, negMax, inMax, outMax):    
+def updateRemapMax(posMax, negMax, inMax, outMax):
     alias = cmds.aliasAttr("twitchBS", q=1 )
     upRemap = []
     downRemap = []

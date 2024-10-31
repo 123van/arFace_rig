@@ -8,20 +8,20 @@ from maya import OpenMaya
 import os.path
 import json
 from functools import partial
-import pymel.core as pm
 
 def shapeBakeWire_tool():
+    print('shin god')
 
     #check to see if window exists
     if cmds.window ('faceShapeBake_setup', exists = True):
         cmds.deleteUI( 'faceShapeBake_setup')
 
     #create window
-    swWindow = cmds.window( 'faceShapeBake_setup', title = 'faceShapeBake setup', w =420, h =940, mnb = True, mxb = True, sizeable=True, resizeToFitChildren = True )
+    swWindow = cmds.window( 'faceShapeBake_setup', title = 'faceShapeBake setup', w =420, h =980, mnb = True, mxb = True, sizeable=True, resizeToFitChildren = True )
     
     #main layout
     mainLayout = cmds.scrollLayout(	horizontalScrollBarThickness=16, verticalScrollBarThickness=16)
-    cmds.columnLayout( w =400, h =920)
+    cmds.columnLayout( w =400, h =960)
     
     #rowColumnLayout
     cmds.rowColumnLayout( numberOfColumns = 3, columnWidth = [(1, 80),(2, 120),(3, 120) ], columnOffset = [(1, 'right', 10)] )
@@ -199,19 +199,40 @@ def shapeBakeWire_tool():
     cmds.text( label = '')
     cmds.button( label = 'write CrvData', command = writeCrvData_json )  
     cmds.button( label = 'findClosestCrv', command = findClosestCrv )
-    
-    print (swWindow)
+    spaceBetween(1, 3)
+
+    cmds.optionMenu('ctl_type', bgc=[0,0,0], changeCommand=printNewMenuItem )
+    cmds.menuItem( label="All" )
+    cmds.menuItem( label="Main" )
+    cmds.menuItem( label="Mid" )
+    cmds.button( label = 'select Ctrls', command = select_ctls )
+    cmds.button(label='reset Ctrls', command=reset_ctls)
+    cmds.text( label = '')
+    spaceBetween(1,3)
+
+    cmds.showWindow(swWindow)
+
     dock = "swDock"
     if cmds.dockControl(dock, exists=True):
         cmds.deleteUI(dock)
     allowedArea = ['right', 'left']
     cmds.dockControl( dock, area="right", content= swWindow, allowedArea="all" )
-    
-    #cmds.showWindow(swWindow)
 
 
 
-    
+
+def select_ctls(*args):
+
+    ctlType = cmds.optionMenu('ctl_type', q=True, value=True)
+
+    select_reset_ctls(ctlType, 'select')
+
+
+def reset_ctls(*args):
+
+    ctlType = cmds.optionMenu('ctl_type', query=True, value=True)
+
+    select_reset_ctls(ctlType, 'reset')
 
 def spaceBetween( numOfRow, numOfColm ):
     for x in range( numOfRow ):
@@ -253,7 +274,7 @@ def copyCrvBS_delta( *pArgs):
     if cmds.objExists( prntGrp ):
         cmds.parent( targetCrv, prntGrp )
     else:
-        prntGrp = cmds.group( w=1, n= wireDfmTitle + "Wire_grp" )
+        cmds.group( w=1, n= wireDfmTitle + "Wire_grp" )
         
     
 
@@ -878,6 +899,64 @@ def copyWgtToBS(weightSurf, headGeo, bsNode, *args):
     else:
         cmds.confirmDialog( title='Confirm', message='"lipWgt_head" not exists ' ) 
         
+
+
+def select_reset_ctls(ctlType, select_reset, *args):
+
+    mainCtlCrv = []
+    for grp in ['attachCtl_grp', 'clsCtl_grp', 'arFacePanel']:
+        if cmds.objExists(grp):
+            temp = [x for x in cmds.listRelatives(grp, ni=1, ad=1) if
+                    cmds.nodeType(x) in ['nurbsCurve', 'nurbsSurface']]
+            mainCtlCrv += temp
+
+    if not mainCtlCrv:
+        raise RuntimeError('no main ctls exist')
+
+    tfmList = set(cmds.listRelatives(mainCtlCrv, p=1))
+    mainCtlList = [ctl for ctl in tfmList if "_grp" not in ctl]
+
+    midCtlCrv = []
+    if cmds.objExists('ctl_grp'):
+        midCtlCrv = [y for y in cmds.listRelatives('ctl_grp', ni=1, ad=1) if
+                cmds.nodeType(y) in ['nurbsCurve', 'nurbsSurface']]
+
+    if not midCtlCrv:
+        raise RuntimeError('no main ctls exist')
+
+    trfmList = set(cmds.listRelatives(midCtlCrv, p=1))
+    midCtlList = [c for c in trfmList if "_grp" not in c]
+
+    allCtls = mainCtlList + midCtlList
+
+    if ctlType =='All':
+        if select_reset == 'select':
+            cmds.select(allCtls, r=1)
+
+        elif select_reset == 'reset':
+            zeroOut_ctls(allCtls)
+
+    elif ctlType == 'Main':
+
+        if select_reset == 'select':
+            cmds.select(mainCtlList, r=1)
+
+        elif select_reset == 'reset':
+            zeroOut_ctls(mainCtlList)
+
+    elif ctlType == 'Mid':
+
+        if select_reset == 'select':
+            cmds.select(midCtlList, r=1)
+
+        elif select_reset == 'reset':
+            zeroOut_ctls(midCtlList)
+
+def zeroOut_ctls(ctl_list, *args):
+
+    for ctl in ctl_list:
+        zeroOut_mainAttr(ctl)
+
 
 def transfer_lipCrvBS( srcCrv, tgtCrv, wireName ):
     # curve cvs    
@@ -3256,9 +3335,37 @@ def findClosesetCrvData_old( myCrv, filePath ):
                 cmds.file( referFile, i =1,  mergeNamespacesOnClash = 1 ) 
     
     else:
-        cmds.confirmDialog( title='Confirm', message='The file name should include either "lipCrv" or "browCrv"!! ' )   
-  
-    
+        cmds.confirmDialog( title='Confirm', message='The file name should include either "lipCrv" or "browCrv"!! ' )
+
+
+def zeroOut_mainAttr(obj):
+
+    mainAttrs = [x for x in cmds.listAttr(obj, k=1) if 'translate' in x or 'rotate' in x]
+    scaleAttrs = [y for y in cmds.listAttr(obj, k=1) if 'scale' in y or 'visibility' in y]
+    for attr in mainAttrs:
+
+        objAttr = '{0}.{1}'.format(obj, attr)
+
+        try:
+
+            cmds.setAttr(objAttr, 0)
+            # print(objAttr)
+
+        except:
+            print(objAttr)
+            continue
+
+    for att in scaleAttrs:
+
+        objAttr = '{0}.{1}'.format(obj, att)
+
+        try:
+
+            cmds.setAttr(objAttr, 1)
+
+        except:
+            print(objAttr)
+            continue
 
 #lip_smoothWeight select lipShpCrv and headGeo
 def lipSmoothWeight( crv , headGeo ):

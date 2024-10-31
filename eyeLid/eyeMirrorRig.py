@@ -734,11 +734,11 @@ def createEyeRig():
 
 
 def eyeWideCanceling_browUpWIP():
-
+    #CONCEPT : browsUp stretch the flesh around eyeSocket area and cancel the movements of eyeWide joints
     #Connected lidFactor.eyeWide_followUp to r_lidWide_cancelMult.input1.input1Y.
 
     multList = cmds.listConnections('l_lidWide_cancelMult.outputY', s=0, d=1)
-    rMultList = [ x for x in multList if 'r_' in x]
+    rMultList = [x for x in multList if 'r_' in x]
     for mult in rMultList:
-        cmds.connectAttr( 'r_lidWide_cancelMult.outputY', '{}.input2X'.format(mult), f=1)
+        cmds.connectAttr('r_lidWide_cancelMult.outputY', '{}.input2X'.format(mult), f=1)
 

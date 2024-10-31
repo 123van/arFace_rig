@@ -6,12 +6,12 @@ from collections import OrderedDict
 from twitchScript.face import face_utils
 reload(face_utils)
 
-
+print("top10")
 def orderedVerts_selection(vtxSel):
     """
     first vertex selection is important
     Args:
-        vtxSel: vertex list on edgeLoop(the first of the list should be the first selection : trackSelOrder)
+        vtxSel: vertex list on edge row(the first of the list should be the first selection : trackSelOrder)
 
     Returns: list of selected vertex in order
     """
@@ -31,9 +31,6 @@ def orderedVerts_selection(vtxSel):
                 firstVtx = vtx
                 ordered.append(firstVtx)
                 break
-
-        else:
-            raise RuntimeError("selection are not on the edgeLoop!!/ check if symmetry turned on")
 
     return ordered
 
@@ -57,8 +54,10 @@ def orderedEdges_edgeLoop(selVerts):
     mel.eval('ConvertSelectionToContainedEdges')
     firstEdge = cmds.filterExpand(ex=True, sm=32)[0]
     firstID = re.findall('\d+', firstEdge)[-1]
-    # not working for the border edges!!!
-    IDList = cmds.polySelect(edgeLoop=int(firstID))
+    IDList = cmds.polySelect(firstEdge, edgeBorder=int(firstID))
+    if not IDList:
+        IDList = cmds.polySelect(firstEdge, edgeLoop=int(firstID))
+
     edgeList = ["{}.e[{}]".format(geo, ID) for ID in IDList]
     edgeLength = len(edgeList)
 
@@ -105,27 +104,27 @@ def orderedEdges_edgeLoop(selVerts):
 
     return edgeList
 
-def orderedVerts_edgeLoop(selVtx):
+def orderedVerts_edgeLoop(vtxSelection):
     """
     select 2 or 3 vertices for ordered vertex-list on the edge loop
     open : using the last vertex selected
     Returns: vertex list on edgeLoop (if edgeLoop is open, the last vertex would not include)
 
     """
-    if not len(selVtx) in [2, 3]:
+    if not len(vtxSelection) in [2, 3]:
         raise RuntimeError("select 2 or 3 vertices")
 
-    if len(selVtx) == 2:
+    if len(vtxSelection) == 2:
 
-        orderedList = selVtx
+        orderedList = vtxSelection
         edgeList = orderedEdges_edgeLoop(orderedList)
         endVert = None
 
-    elif len(selVtx) == 3:
+    elif len(vtxSelection) == 3:
 
-        orderedList = selVtx[:-1]
+        orderedList = vtxSelection[:-1]
         edgeList = orderedEdges_edgeLoop(orderedList)
-        endVert = selVtx[2]
+        endVert = vtxSelection[2]
 
     # [[vert1, vert2], ...]
     vtxPairList = [edgeToVertexPair(x) for x in edgeList[1:-1]]
@@ -402,7 +401,7 @@ def createPolyToCurve(orderedEdges, name=None, **kwargs):
 def curveOnEdgeLoop(name, nature, selVtx, degree):
 
     if not cmds.objExists("surfaceMap_grp"):
-        cmds.group(em=1, n="surfaceMap_grp", p="dumpBin_grp")
+        cmds.group(em=1, n="surfaceMap_grp")
 
     if not len(selVtx) in [2, 3]:
         raise RuntimeError("select 2 or 3 vertices")
@@ -583,7 +582,7 @@ def mapEPCurve(orderedVertices, name, openClose, degree, suffix):
             orderedPos = orderPos
         else:
             orderedPos = rightPos + leftPos
-            print("the curve first{}, middle{}, and end{}".format(rightPos[0], leftPos[1], leftPos[2]))
+
         browMapCrv = cmds.curve(d=float(degree), ep=orderedPos)
         cmds.rename(browMapCrv, rename)
 
@@ -646,7 +645,8 @@ def browMapCurve(orderSel, numOfVtx, nature):
         for poc in browPocList:
             pos = cmds.getAttr("{}.position".format(poc))[0]
             posList.append(pos)
-        baseCrv = cmds.curve(d=1, ep=posList, n="brow_{}_crv01".format(nature))
+        tempCrv = cmds.curve(d=1, ep=posList)
+        baseCrv = cmds.rename(tempCrv, "brow_{}_crv01".format(nature))
         cmds.parent(baseCrv, "surfaceMap_grp")
         upCrv = cmds.duplicate(baseCrv, rc=1, n="brow_{}_crv02".format(nature))[0]
         loCrv = cmds.duplicate(baseCrv, rc=1, n="brow_{}_crv03".format(nature))[0]
@@ -960,7 +960,7 @@ def copyCurveShape(crvSel):
 
     for i in range(scLeng):
         scPos = cmds.xform(scCvs[i], q=1, os=1, t=1)
-
+        print(scPos[0])
         cmds.setAttr(dnCvs[i] + ".xValue", scPos[0])
         cmds.setAttr(dnCvs[i] + ".yValue", scPos[1])
         cmds.setAttr(dnCvs[i] + ".zValue", scPos[2])
@@ -1070,3 +1070,4 @@ def UnlockAll(objs):
             except ValueError:
                 continue
     print(locked)
+

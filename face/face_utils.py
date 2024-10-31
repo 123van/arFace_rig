@@ -451,8 +451,8 @@ def copyOrigMesh(obj, name):
 def deleteTrashOrigShape(objSel):
 
     shapes = cmds.listRelatives(objSel, ad=1, type='shape')
-    origShape = [t for t in shapes if 'Orig' in t]
-    # get the orig shapes with history and delete the ones with same name.
+    origShape = [shp for shp in shapes if cmds.getAttr('{}.intermediateObject'.format(shp)) == 1]
+
     mainOrig = []
     for orig in origShape:
         if cmds.listConnections(orig, s=0, d=1):
@@ -460,7 +460,7 @@ def deleteTrashOrigShape(objSel):
         else:
             cmds.delete(orig)
 
-    return mainOrig[0]
+    return mainOrig
 
 
 class Util(Core.Core):
@@ -640,6 +640,7 @@ class Util(Core.Core):
 
         return pocNode
 
+
     @classmethod
     def writeJsonFile(cls, jsonFile, data):
         """
@@ -778,7 +779,6 @@ class Util(Core.Core):
             self.upLowInput(EyeLipBrow, selectedVtx)
 
         return orderedVerts
-
 
     def upLowInput(self, currentName, selectedVtx):
         """

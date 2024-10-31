@@ -2,16 +2,18 @@ from maya import cmds
 import maya.mel as mel
 # from conLibrary import app
 # reload(app)
-from conLibrary import controllerLibTest
-reload(controllerLibTest)
-from arFace.Misc import Core
+from imp import reload
+#from conLibrary import controllerLibTest
+#reload(controllerLibTest)
+
 from functools import partial
-from twitchScript.face import face_utils, rigStructure, faceFactor, faceSkin, curve_utils, blendShapeFunc
+from twitchScript.face import face_utils, rigStructure, faceFactor, faceSkin, curve_utils, blendShapeFunc, weight_transferUI
 reload(face_utils)
 reload(faceFactor)
 reload(faceSkin)
 reload(curve_utils)
 reload(blendShapeFunc)
+reload(weight_transferUI)
 
 import os
 from twitchScript.brow import browRig
@@ -53,7 +55,7 @@ class ArcFaceUI(face_utils.Util):
         self.ctl = None
         self.configFile = configFile
         self.windowName = 'arcFaceUI'
-        self.headInfo ={}
+        self.headInfo = {}
         self.vertexData = {}
         self.lipOrderVtx = {}
         self.textColor = [0.64, 0.42, 0.33]
@@ -227,7 +229,7 @@ class ArcFaceUI(face_utils.Util):
             insertText = self.vertexData['loLipVerts']
         else:
             insertText = ''
-        self.loLipVertsTextField = cmds.textField('loLipVertsTextField', ed=False, tx=str(insertText), w = 240)
+        self.loLipVertsTextField = cmds.textField('loLipVertsTextField', ed=False, tx=str(insertText), w=240)
         self.spaceBetween(1, 2, "text")
 
         cmds.button(label='Update Vtx Selection', bgc=self.buttonColor, command= self.updateVtxSelection)
@@ -599,7 +601,7 @@ class ArcFaceUI(face_utils.Util):
         self.weightedDeformer = cmds.textField('weightedDeformer', ed=True, tx='', w=240)
         self.spaceBetween(1, 3, "text")
 
-        cmds.text(label=' Weighted Influences ', bgc=self.buttonColor)
+        cmds.button(label='Weight Source Items', bgc=self.buttonColor, c=self.weightSourceItems)
         self.weightedItems = cmds.textField('weightedItems', ed=True, tx='', w=240)
         self.spaceBetween(1, 8, "text")
 
@@ -609,7 +611,6 @@ class ArcFaceUI(face_utils.Util):
         self.spaceBetween(1, 2, "text")
         cmds.button(label='Add Corrective & Reset', bgc=self.buttonColor, c=self.addCorrective_reset)
         cmds.button(label='bakeWgt To Corrective', bgc=self.buttonColor, c=self.bakeWeight_toCorrective)
-        cmds.text(label=' only in rx or ry')
 
         cmds.tabLayout(tabs,
                        edit=True,
@@ -619,7 +620,6 @@ class ArcFaceUI(face_utils.Util):
 
                        )
 
-        # ,
         # (eyelidTab, 'eyelid'),
         # (eyebrowTab, 'eyebrow'),
         # (lipTab, 'lip'),
@@ -637,14 +637,15 @@ class ArcFaceUI(face_utils.Util):
         blendShapeFunc.createTwitchBS()
 
     def weightTransfer(self, *args):
-        print('please add user input for weightTransfer')
-        pass
+
+        wgtTranUI = weight_transferUI.WeightTransferUI()
+        wgtTranUI.show()
 
     def setWeightedDeformer(self, *args):
 
         dformer = cmds.ls(sl=1)[0]
         cmds.textField('weightedDeformer', e=1, tx=str(dformer))
-
+        '''
         weightedObjList = []
         if cmds.nodeType(dformer) == 'skinCluster':
             if ":" in dformer:
@@ -668,8 +669,7 @@ class ArcFaceUI(face_utils.Util):
 
         elif cmds.nodeType(dformer) == 'blendShape':
 
-            aliasList = cmds.aliasAttr(dformer, q=1)
-            weightedObjList = [tgt for tgt, wgt in zip(*[iter(aliasList)]*2)]
+            weightedObjList = cmds.listAttr(dformer + '.w', multi=True)
 
         else:
             print("let's add other deformer")
@@ -683,31 +683,109 @@ class ArcFaceUI(face_utils.Util):
             else:
                 targetText += weightedObjList[index] + ','
 
-        cmds.textField('weightedItems', e=1, tx=str(targetText))
+        cmds.textField('weightedItems', e=1, tx=str(targetText))'''
+
+    def get_blendshape_targets(self, blendshape_node):
+        # Get the targets of the blendShape node
+        targets = cmds.listAttr(blendshape_node + '.w', multi=True) or []
+
+        return targets
+
+    def weightSourceItems(self, *args):
+        dform = cmds.textField('weightedDeformer', q=1, tx=1)
+        self.show_weighted_items_window(dform)
+
+    def show_weighted_items_window(self, dform):
+        """
+        1. It is ok to use a deformer from the other geometry (same topology)
+        """
+
+        # Create a window
+        window_name = "weightSourceWindow"
+        if cmds.window(window_name, exists=True):
+            cmds.deleteUI(window_name, window=True)
+
+        cmds.window(window_name, title="weight source", widthHeight=(300, 200))
+
+        # Create a layout
+        cmds.columnLayout(adjustableColumn=True)
+
+        if cmds.nodeType(dform) == "blendShape":
+            targets = self.get_blendshape_targets(dform)
+
+            if targets:
+                cmds.text(label=dform, font="boldLabelFont")
+
+                target_list = cmds.textScrollList(
+                    numberOfRows=len(targets),
+                    allowMultiSelection=True,
+                    append=targets
+                )
+            else:
+                cmds.warning("No blendShape targets found for {}.".format(dform))
+
+        if cmds.nodeType(dform) == "skinCluster":
+            weightedObjList = []
+            deformer = dform.split(':')[1] if ':' in dform else dform
+
+            facePart = deformer.split('Map')[0]
+            if facePart == 'brow':
+                jntList = cmds.getAttr('browFactor.browJntList')
+
+            elif facePart == 'lip':
+                upJntList = cmds.getAttr('lipFactor.upLipJnt')
+                loJntList = cmds.getAttr('lipFactor.loLipJnt')
+                cornerJntList = cmds.getAttr('lipFactor.cornerLipJnt')
+                jntList = [cornerJntList[0]] + upJntList + [cornerJntList[1]] + loJntList
+
+            wgtJnts = cmds.skinCluster(dform, q=1, wi=1)
+            for jnt in jntList:
+                childJnt = cmds.listRelatives(jnt, ad=1, type='joint')[0]
+                weightedJnt = [jot for jot in wgtJnts if childJnt in jot][0]
+                weightedObjList.append(weightedJnt)
+
+            if weightedObjList:
+                cmds.text(label=dform, font="boldLabelFont")
+
+                target_list = cmds.textScrollList(
+                    numberOfRows=len(weightedObjList),
+                    allowMultiSelection=True,
+                    append=weightedObjList
+                )
+
+        # Create a button to get the selected targets
+        cmds.button(label="Store Selected Targets", command=lambda x: self.store_selected_weightedItems(target_list))
+
+        # Create a button to close the window
+        cmds.button(label="Close", command=lambda x: cmds.deleteUI(window_name, window=True))
+
+        # Show the window
+        cmds.showWindow(window_name)
+
+    def store_selected_weightedItems(self, target_list):
+        # Get the selected targets from the textScrollList / return list[]
+        selected_targets = cmds.textScrollList(target_list, query=True, selectItem=True) or []
+
+        print("Selected Targets:", selected_targets)
+        cmds.textField('weightedItems', e=1, tx=str(selected_targets))
 
     def bakeWeight_toCorrective(self, *args):
 
         weightedDformer = cmds.textField('weightedDeformer', q=1, tx=1)
         weightedItems = cmds.textField('weightedItems', q=1, tx=1)
-        if not weightedDformer and not weightedItems:
+        if not weightedDformer or not weightedItems:
 
             raise RuntimeError('store targets first!!')
 
-        if "," in weightedItems:
-            wgtItemList = [x.strip() for x in weightedItems.split(',')]
-
-        else:
-            wgtItemList = [weightedItems]
-
-        print(wgtItemList)
+        print(weightedItems)
         sculptedGeo = cmds.ls(sl=1, type='transform')[0]
         if not self.BSClass:
             self.BSClass = blendShapeFunc.BlendShapeFunc()
-        self.BSClass.bakeWeight_toCorrective(weightedDformer, wgtItemList, sculptedGeo)
+        self.BSClass.bakeWeight_toCorrective(weightedDformer, weightedItems, sculptedGeo)
 
     def addCorrective_reset(self, *args):
         """
-        select target first and headGeo ( just add target in blendShape)
+        select target first and headGeo (add target in blendShape)
         """
         mySel = cmds.ls(os=1, type='transform')
         target = mySel[0]
@@ -1130,9 +1208,10 @@ class ArcFaceUI(face_utils.Util):
         self.importControlPanel()
 
     def controllerLibrary(self, *args):
-
-        self.ctlLib = app.ControllerLibraryUITest()
-        self.ctlLib.show()
+        pass
+        aas = 'yNegXNeg'
+        #self.ctlLib = controllerLibTest.ControllerLibraryUITest()
+        #self.ctlLib.show()
 
     def storeController(self, *args):
 
